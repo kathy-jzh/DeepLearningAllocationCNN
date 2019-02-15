@@ -1,8 +1,6 @@
 from ipyLogger import get_logger
 import sys
 import pickle
-import pandas as pd
-import os
 
 
 def __get_ipython_func():
@@ -39,7 +37,7 @@ def log(msg, environment='', loglevel='info', **kwargs):
 
 
 def dump_pickle(obj, path: str, protocol=pickle.HIGHEST_PROTOCOL):
-    f = open(path+'.pickle', 'wb')
+    f = open(path + '.pickle', 'wb')
     pickle.dump(obj, f, protocol=protocol)
     f.close()
 
@@ -52,7 +50,7 @@ def load_pickle(path: str, logger_env='Pickles'):
     :return: object of the pickle
     """
     # ensuring the file ends in '.pickle'
-    path = path.replace('.pickle','')+'.pickle'
+    path = path.replace('.pickle', '') + '.pickle'
 
     log('Unpickling data at {}'.format(path), environment=logger_env)
     f = open(path, 'rb')
@@ -60,9 +58,3 @@ def load_pickle(path: str, logger_env='Pickles'):
     f.close()
     log('Data unpickled, type: {}'.format(res.__class__), environment=logger_env)
     return res
-
-
-
-
-
-

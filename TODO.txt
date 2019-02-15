@@ -39,3 +39,8 @@
     - Concretely we would have to change the targets
     - maybe try predictions after more than 1 week ?
     - Backtest using Delta-Hedged ATM options ?
+
+# TODO functions:
+
+_get_data_from_stocks in data_processing
+_build_close_returns in data_processing

@@ -3,16 +3,18 @@ import tensorflow as tf
 import random
 import time
 from sklearn.metrics import confusion_matrix
+
 from models.CNNModels import Net
 from utils import log
 from models.utils import UtilsTraining
-from config.hyperparams import DEFAULT_LOG_ENV,NB_OF_EPOCHS_FOR_BAYESIAN,FRAC_BATCH_TO_DISPLAY # todo
+from config.hyperparams import DEFAULT_LOG_ENV, NB_OF_EPOCHS_FOR_BAYESIAN
+
 
 def train_predict(X, Y, valX, valY,
                   net: Net, model_ckpt_path, cost_sensitive_loss=False,
                   cost_matrix=np.array([[0, 1.1, 1.3], [1.1, 0, 1.1], [1.3, 1.1, 0]]),
                   is_bayesian=False,
-                  batch_size=128, epochs=50, save_step=10, display_step = 1,
+                  batch_size=128, epochs=50, save_step=10, display_step=1,
                   *args, **kwargs):
     """ Function to train and make prediction with models
 
@@ -43,7 +45,7 @@ def train_predict(X, Y, valX, valY,
     sample_size, _, image_size, channel_size = X.shape
 
     # number of batches
-    nb_of_batches_training = max(int(sample_size / batch_size),1)
+    nb_of_batches_training = max(int(sample_size / batch_size), 1)
 
     # calculate expected penalty if we consider a cost sensitive  loss
     if cost_sensitive_loss:
@@ -53,13 +55,10 @@ def train_predict(X, Y, valX, valY,
         expected_penalty = None
     kwargs.update({'expected_penalty': expected_penalty})
 
-
-
     with tf.Graph().as_default():
         with tf.variable_scope("CNN_model"):
 
             net.build_operations(**kwargs)
-
 
             with tf.Session() as sess:
 
@@ -71,7 +70,7 @@ def train_predict(X, Y, valX, valY,
                     # Display the epoch beginning
                     if (e + 1) % display_step == 0:
                         text_to_print = '***************** Epoch: {:03d}/{:03d} *****************'.format(e + 1, epochs)
-                        log(text_to_print,DEFAULT_LOG_ENV)
+                        log(text_to_print, DEFAULT_LOG_ENV)
 
                     epoch_start_time = time.time()
 
@@ -79,7 +78,6 @@ def train_predict(X, Y, valX, valY,
                     Z = list(zip(X, Y))
                     random.shuffle(Z)
                     X, Y = zip(*Z)
-
 
                     # X,Y = np.asarray(X),np.asarray(Y) # todo se when necessary
 
@@ -92,8 +90,11 @@ def train_predict(X, Y, valX, valY,
                         c, a = sess.run([net.loss, net.accuracy], feed_dict={net.x: x_b, net.y: y_b})
                         cc += (c * len(y_b))  # len(y_b) since the last batch can be of size smaller than batch size
                         aa += (a * len(y_b))
-                        if (b+1) % max(int(0.01*nb_of_batches_training),1) == 0:
-                            log('Batch {}/{} done ***  CumLoss: {:.4f} CumAccuracy: {:.4f}'.format(b+1,nb_of_batches_training,cc/(batch_size*(b+1)),aa/(batch_size*(b+1))), DEFAULT_LOG_ENV)
+                        if (b + 1) % max(int(0.01 * nb_of_batches_training), 1) == 0:
+                            log('Batch {}/{} done ***  CumLoss'
+                                ': {:.4f} CumAccuracy: {:.4f}'.format(b + 1, nb_of_batches_training,
+                                                                      cc / (batch_size * (b + 1)),
+                                                                      aa / (batch_size * (b + 1))), DEFAULT_LOG_ENV)
                     epoch_loss, epoch_acc = cc / float(sample_size), aa / float(sample_size)
                     training_loss.append(epoch_loss)
 
@@ -103,18 +104,19 @@ def train_predict(X, Y, valX, valY,
                     val_loss.append(epoch_val_loss)
 
                     # Displaying training info for the epoch
-                    if (e+1) % display_step == 0:
+                    if (e + 1) % display_step == 0:
                         text_to_print = "Training time: {}  ======== Loss: {:.4f} Accuracy: {:.4f} val_Loss: {:.4f} val_acc: {:.4f} ".format(
                             round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_loss,
                             epoch_val_acc)
-                        log(text_to_print,DEFAULT_LOG_ENV)
+                        log(text_to_print, DEFAULT_LOG_ENV)
 
                     # Saving the model
-                    if (e+1) % save_step == 0:
-                        net.save(sess, model_ckpt_path,verbose=True, epoch=e+1)
+                    if (e + 1) % save_step == 0:
+                        net.save(sess, model_ckpt_path, verbose=True, epoch=e + 1)
 
                     # Adding values to summary
-                    summary_str = sess.run(net.summary_op, feed_dict={net.x: x_b, net.y: y_b})  # todo should'nt we consider valX and valY here ?
+                    # todo should'nt we consider valX and valY here ?
+                    summary_str = sess.run(net.summary_op, feed_dict={net.x: x_b, net.y: y_b})
                     writer.add_summary(summary_str, sess.run(net.global_step))
 
                 writer.close()
