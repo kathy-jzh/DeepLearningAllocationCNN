@@ -1,4 +1,4 @@
-*.pickle
+# *.pickle
 *.csv
 
 logs/
