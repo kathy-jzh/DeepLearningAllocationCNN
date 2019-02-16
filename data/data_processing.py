@@ -338,7 +338,7 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
     val_d = np.sum(Y_val, axis=0) / len(Y_val)
     tst_d = np.sum(Y_test, axis=0) / len(Y_test)
 
-    text = 'long: {:1f}%, hold: {:1f}%, short: {:1f}%'
+    text = 'long: {:5.2f}%, hold: {:5.2f}%, short: {:5.2f}%'
     log('Training Distribution of Labels :' + text.format(train_d[0] * 100, train_d[1] * 100, train_d[2] * 100),
         environment=logger_env)
     log('Validation Distribution of Labels :' + text.format(val_d[0] * 100, val_d[1] * 100, val_d[2] * 100),

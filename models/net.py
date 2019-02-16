@@ -8,8 +8,9 @@ class Net:
     a mother class for all types of nets
     """
 
-    def __init__(self, shape_x: iter, shape_y: iter, hyperparams: dict):
+    def __init__(self, shape_x: iter, shape_y: iter, hyperparams: dict,name:str):
         self._hyperparams = hyperparams
+        self.name = name
 
 
         self._shape_x = shape_x
@@ -224,19 +225,25 @@ class Net:
             log('tf_optimizer was not specified in hyperparams, using default:{}'.format(DEFAULT_TF_OPTIMIZER),
                 loglevel='warning',environment=DEFAULT_LOG_ENV)
             tf_optimizer = DEFAULT_TF_OPTIMIZER
+        if tf_optimizer.lower() == 'adam':
+            tf_optimizer = tf.train.AdamOptimizer
+        elif tf_optimizer.lower() == 'sgd':
+            tf_optimizer = tf.train.GradientDescentOptimizer
+        else:
+            raise NotImplementedError('You need to modify the code to use another optimizer so far we have sgd and adam')
 
         tf.summary.scalar('training_loss', self.loss)
-        self.optimizer = tf_optimizer(learning_rate=learning_rate).minimize(self.loss, global_step=self.global_step)
+        self.optimizer = tf_optimizer(learning_rate=learning_rate).minimize(self.loss, global_step=self.global_step,name='minimize')
         # todo find how the learning rate changes result
 
 
-    def save(self, sess:tf.Session,model_ckpt_path:str,verbose=False,epoch=None):
+    def save(self, sess:tf.Session,model_ckpt_path:str,verbose=False,epoch=None,write_meta_graph=True):
 
         if verbose:
             msg = 'Saving Model to {}, global step = {}'.format(model_ckpt_path,self.global_step.eval(sess))
             msg = msg +' epoch: {}'.format(epoch) if epoch else msg
             log(msg,environment=DEFAULT_LOG_ENV)
-        self.saver.save(sess, model_ckpt_path, self.global_step)
+        self.saver.save(sess, model_ckpt_path, self.global_step,write_meta_graph=write_meta_graph)
         if verbose:
             log('Model Saved', environment=DEFAULT_LOG_ENV)
 
@@ -263,6 +270,9 @@ class Net:
         self._accuracy_func()
         self.summary_op = tf.summary.merge_all()
         self.init = tf.global_variables_initializer()
-        self.saver =  tf.train.Saver()
+
+        max_save_to_keep = kwargs.get('max_save_to_keep', 4)
+        self.saver =  tf.train.Saver(max_to_keep=kwargs.get('max_save_to_keep',4))
+        log('Saver will keep the last {} latest models'.format(max_save_to_keep),DEFAULT_LOG_ENV)
 
 

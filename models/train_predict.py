@@ -56,7 +56,7 @@ def train_predict(X, Y, valX, valY,
     kwargs.update({'expected_penalty': expected_penalty})
 
     with tf.Graph().as_default():
-        with tf.variable_scope("CNN_model"):
+        with tf.variable_scope(net.name):
 
             net.build_operations(**kwargs)
 
@@ -69,7 +69,7 @@ def train_predict(X, Y, valX, valY,
                 for e in range(epochs):
                     # Display the epoch beginning
                     if (e + 1) % display_step == 0:
-                        text_to_print = '***************** Epoch: {:03d}/{:03d} *****************'.format(e + 1, epochs)
+                        text_to_print = '\n***************** Epoch: {:03d}/{:03d} *****************'.format(e + 1, epochs)
                         log(text_to_print, DEFAULT_LOG_ENV)
 
                     epoch_start_time = time.time()
@@ -90,7 +90,7 @@ def train_predict(X, Y, valX, valY,
                         c, a = sess.run([net.loss, net.accuracy], feed_dict={net.x: x_b, net.y: y_b})
                         cc += (c * len(y_b))  # len(y_b) since the last batch can be of size smaller than batch size
                         aa += (a * len(y_b))
-                        if (b + 1) % max(int(0.01 * nb_of_batches_training), 1) == 0:
+                        if (b + 1) % max(int(0.1 * nb_of_batches_training), 1) == 0:
                             log('Batch {}/{} done ***  CumLoss'
                                 ': {:.4f} CumAccuracy: {:.4f}'.format(b + 1, nb_of_batches_training,
                                                                       cc / (batch_size * (b + 1)),
@@ -112,12 +112,14 @@ def train_predict(X, Y, valX, valY,
 
                     # Saving the model
                     if (e + 1) % save_step == 0:
-                        net.save(sess, model_ckpt_path, verbose=True, epoch=e + 1)
+                        net.save(sess, model_ckpt_path, verbose=True, epoch=e + 1,write_meta_graph=True)
 
                     # Adding values to summary
                     # todo should'nt we consider valX and valY here ?
                     summary_str = sess.run(net.summary_op, feed_dict={net.x: x_b, net.y: y_b})
                     writer.add_summary(summary_str, sess.run(net.global_step))
+
+                net.save(sess, model_ckpt_path, verbose=True, epoch=epochs + 1, write_meta_graph=True)
 
                 writer.close()
 
@@ -134,3 +136,5 @@ def get_confusion_matrix(ytrue, ypred):
     ytrue = np.argmax(ytrue, axis=1)
     ypred = np.argmax(ypred, axis=1)
     return confusion_matrix(ytrue, ypred)
+
+

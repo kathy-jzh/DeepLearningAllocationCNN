@@ -1,7 +1,5 @@
-import tensorflow as tf
-
 DEFAULT_LEARNING_RATE = 0.001
-DEFAULT_TF_OPTIMIZER = tf.train.AdamOptimizer # todo try to avoid tensorflow in here
+DEFAULT_TF_OPTIMIZER = 'Adam' # todo try to avoid tensorflow in here
 DEFAULT_LOG_ENV = 'training_and_validation'
 NB_OF_EPOCHS_FOR_BAYESIAN = 10
 FRAC_BATCH_TO_DISPLAY = 0.1
@@ -75,10 +73,10 @@ inception3_hyperparam={
 }
 first_block_gglnet_hyperparam = {
     # 1st convolutional layer block
-    "conv1_conv_kernel": (2,2,4,16),
+    "conv1_conv_kernel": (4,4,4,16),
 
     # 2nd convolutional layer block
-    "conv2_conv_kernel": (2, 2, 16, 8)
+    "conv2_conv_kernel": (3, 3, 16, 8)
 }
 # hyperparameter list for other convolutional parts in GoogLeNet
 GoogleNet_hyperparams = {'first_block':first_block_gglnet_hyperparam,

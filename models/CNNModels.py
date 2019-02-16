@@ -11,8 +11,8 @@ class CondensedGoogLeNet(Net):
 
         """
 
-    def __init__(self, shape_x:iter, shape_y:iter, hyperparams:dict):
-        super().__init__(shape_x, shape_y, hyperparams)
+    def __init__(self, shape_x:iter, shape_y:iter, hyperparams:dict,name='CondensedGoogLeNet'):
+        super().__init__(shape_x, shape_y, hyperparams,name)
 
     def _inference(self,**kwargs):
         inputs = self.x
@@ -57,7 +57,7 @@ class CondensedGoogLeNet(Net):
         x = tf.nn.dropout(x, keep_prob=1 - dropout)
 
         x = self.dense_layer(x, units=self._shape_y[-1], name='dense_layer')
-        outputs = tf.nn.softmax(x)
+        outputs = tf.nn.softmax(x,name='output')
         self._pre_thresholded_output = x
         self.output = outputs
         # return x, outputs
