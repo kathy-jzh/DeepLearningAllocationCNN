@@ -15,7 +15,7 @@ def train_predict(X, Y, valX, valY,
                   cost_matrix=np.array([[0, 1.1, 1.3], [1.1, 0, 1.1], [1.3, 1.1, 0]]),
                   is_bayesian=False,
                   batch_size=128, epochs=50, save_step=10, display_step=1,
-                  *args, **kwargs):
+                  restore=False,model_ckpt_path_to_restore=None, **kwargs):
     """ Function to train and make prediction with models
 
         Args:
@@ -55,80 +55,238 @@ def train_predict(X, Y, valX, valY,
         expected_penalty = None
     kwargs.update({'expected_penalty': expected_penalty})
 
-    with tf.Graph().as_default():
-        with tf.variable_scope(net.name):
 
-            net.build_operations(**kwargs)
+    if restore:
 
-            with tf.Session() as sess:
+        sess = tf.Session()
+        graph = tf.get_default_graph()
+        net.restore_importants_ops(sess, model_ckpt_path_to_restore)
 
-                sess.run(net.init)
-                writer = tf.summary.FileWriter('logs', sess.graph)
 
-                training_loss, val_loss, pred = [], [], []
-                for e in range(epochs):
-                    # Display the epoch beginning
-                    if (e + 1) % display_step == 0:
-                        text_to_print = '\n***************** Epoch: {:03d}/{:03d} *****************'.format(e + 1, epochs)
-                        log(text_to_print, DEFAULT_LOG_ENV)
+        # sess.run(net.init)
+        writer = tf.summary.FileWriter('logs', sess.graph)
 
-                    epoch_start_time = time.time()
+        training_loss, val_loss, pred = [], [], []
+        for e in range(epochs):
+            # Display the epoch beginning
+            if (e + 1) % display_step == 0:
+                text_to_print = '\n***************** Epoch: {:03d}/{:03d} *****************'.format(e + 1,
+                                                                                                    epochs)
+                log(text_to_print, DEFAULT_LOG_ENV)
 
-                    # Shuffle dataset before doing an epoch of training # todo see if we delete it
-                    Z = list(zip(X, Y))
-                    random.shuffle(Z)
-                    X, Y = zip(*Z)
+            epoch_start_time = time.time()
 
-                    # X,Y = np.asarray(X),np.asarray(Y) # todo se when necessary
+            # Shuffle dataset before doing an epoch of training # todo see if we delete it
+            Z = list(zip(X, Y))
+            random.shuffle(Z)
+            X, Y = zip(*Z)
 
-                    cc, aa = 0, 0
-                    for b in range(nb_of_batches_training):
-                        x_b, y_b = UtilsTraining._extract_minibatch(X, Y, batch_size=batch_size, current_batch=b)
-                        sess.run([net.optimizer, net.global_step], feed_dict={net.x: x_b, net.y: y_b})
+            # X,Y = np.asarray(X),np.asarray(Y) # todo see when necessary
 
-                        # Make evaluation on a batch basis
-                        c, a = sess.run([net.loss, net.accuracy], feed_dict={net.x: x_b, net.y: y_b})
-                        cc += (c * len(y_b))  # len(y_b) since the last batch can be of size smaller than batch size
-                        aa += (a * len(y_b))
-                        if (b + 1) % max(int(0.1 * nb_of_batches_training), 1) == 0:
-                            log('Batch {}/{} done ***  CumLoss'
-                                ': {:.4f} CumAccuracy: {:.4f}'.format(b + 1, nb_of_batches_training,
-                                                                      cc / (batch_size * (b + 1)),
-                                                                      aa / (batch_size * (b + 1))), DEFAULT_LOG_ENV)
-                    epoch_loss, epoch_acc = cc / float(sample_size), aa / float(sample_size)
-                    training_loss.append(epoch_loss)
+            cc, aa = 0, 0
+            for b in range(nb_of_batches_training):
+                x_b, y_b = UtilsTraining._extract_minibatch(X, Y, batch_size=batch_size, current_batch=b)
+                sess.run([net.optimizer, net.global_step], feed_dict={net.x: x_b, net.y: y_b})
 
-                    output_val, epoch_val_loss, epoch_val_acc = sess.run([net.output, net.loss, net.accuracy],
-                                                                         feed_dict={net.x: valX, net.y: valY})
-                    pred.append(output_val)
-                    val_loss.append(epoch_val_loss)
+                # Make evaluation on a batch basis
+                c, a = sess.run([net.loss, net.accuracy], feed_dict={net.x: x_b, net.y: y_b})
+                cc += (c * len(y_b))  # len(y_b) since the last batch can be of size smaller than batch size
+                aa += (a * len(y_b))
+                if (b + 1) % max(int(0.1 * nb_of_batches_training), 1) == 0:
+                    log('Batch {}/{} done ***  CumLoss'
+                        ': {:.4f} CumAccuracy: {:.4f}'.format(b + 1, nb_of_batches_training,
+                                                              cc / (batch_size * (b + 1)),
+                                                              aa / (batch_size * (b + 1))), DEFAULT_LOG_ENV)
+            epoch_loss, epoch_acc = cc / float(sample_size), aa / float(sample_size)
+            training_loss.append(epoch_loss)
 
-                    # Displaying training info for the epoch
-                    if (e + 1) % display_step == 0:
-                        text_to_print = "Training time: {}  ======== Loss: {:.4f} Accuracy: {:.4f} val_Loss: {:.4f} val_acc: {:.4f} ".format(
-                            round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_loss,
-                            epoch_val_acc)
-                        log(text_to_print, DEFAULT_LOG_ENV)
+            output_val, epoch_val_loss, epoch_val_acc = sess.run([net.output, net.loss, net.accuracy],
+                                                                 feed_dict={net.x: valX, net.y: valY})
+            pred.append(output_val)
+            val_loss.append(epoch_val_loss)
 
-                    # Saving the model
-                    if (e + 1) % save_step == 0:
-                        net.save(sess, model_ckpt_path, verbose=True, epoch=e + 1,write_meta_graph=True)
+            # Displaying training info for the epoch
+            if (e + 1) % display_step == 0:
+                text_to_print = "Training time: {}  ======== Loss: {:.4f} Accuracy: {:.4f} val_Loss: {:.4f} val_acc: {:.4f} ".format(
+                    round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_loss,
+                    epoch_val_acc)
+                log(text_to_print, DEFAULT_LOG_ENV)
 
-                    # Adding values to summary
-                    # todo should'nt we consider valX and valY here ?
-                    summary_str = sess.run(net.summary_op, feed_dict={net.x: x_b, net.y: y_b})
-                    writer.add_summary(summary_str, sess.run(net.global_step))
+            # Saving the model
+            if (e + 1) % save_step == 0:
+                net.save(sess, model_ckpt_path, verbose=True, epoch=e + 1, write_meta_graph=True)
 
-                net.save(sess, model_ckpt_path, verbose=True, epoch=epochs + 1, write_meta_graph=True)
+            # Adding values to summary
+            # todo should'nt we consider valX and valY here ?
+            summary_str = sess.run(net.summary_op, feed_dict={net.x: x_b, net.y: y_b})
+            writer.add_summary(summary_str, sess.run(net.global_step))
 
-                writer.close()
+        net.save(sess, model_ckpt_path, verbose=True, epoch=epochs, write_meta_graph=True)
 
-                if is_bayesian:
-                    # Sample from the last NB_OF_EPOCHS_FOR_BAYESIAN epochs to form Bayesian learning: average across last 10 epochs of predictions
-                    return (np.mean(pred[-NB_OF_EPOCHS_FOR_BAYESIAN:], axis=0), training_loss, val_loss)
-                else:
-                    return (pred[-1], training_loss, val_loss)
+        writer.close()
 
+        if is_bayesian:
+            # Sample from the last NB_OF_EPOCHS_FOR_BAYESIAN epochs to form Bayesian learning: average across last 10 epochs of predictions
+            return (np.mean(pred[-NB_OF_EPOCHS_FOR_BAYESIAN:], axis=0), training_loss, val_loss)
+        else:
+            return (pred[-1], training_loss, val_loss)
+    else:
+
+        with tf.Graph().as_default():
+            with tf.variable_scope(net.name,reuse=None):
+                net.build_operations(**kwargs)
+                with tf.Session() as sess:
+
+                    sess.run(net.init)
+                    writer = tf.summary.FileWriter('logs', sess.graph)
+
+                    training_loss, val_loss, pred = [], [], []
+                    for e in range(epochs):
+                        # Display the epoch beginning
+                        if (e + 1) % display_step == 0:
+                            text_to_print = '\n***************** Epoch: {:03d}/{:03d} *****************'.format(e + 1,
+                                                                                                                epochs)
+                            log(text_to_print, DEFAULT_LOG_ENV)
+
+                        epoch_start_time = time.time()
+
+                        # Shuffle dataset before doing an epoch of training # todo see if we delete it
+                        Z = list(zip(X, Y))
+                        random.shuffle(Z)
+                        X, Y = zip(*Z)
+
+                        # X,Y = np.asarray(X),np.asarray(Y) # todo se when necessary
+
+                        cc, aa = 0, 0
+                        for b in range(nb_of_batches_training):
+                            x_b, y_b = UtilsTraining._extract_minibatch(X, Y, batch_size=batch_size, current_batch=b)
+                            sess.run([net.optimizer, net.global_step], feed_dict={net.x: x_b, net.y: y_b})
+
+                            # Make evaluation on a batch basis
+                            c, a = sess.run([net.loss, net.accuracy], feed_dict={net.x: x_b, net.y: y_b})
+                            cc += (c * len(y_b))  # len(y_b) since the last batch can be of size smaller than batch size
+                            aa += (a * len(y_b))
+                            if (b + 1) % max(int(0.1 * nb_of_batches_training), 1) == 0:
+                                log('Batch {}/{} done ***  CumLoss'
+                                    ': {:.4f} CumAccuracy: {:.4f}'.format(b + 1, nb_of_batches_training,
+                                                                          cc / (batch_size * (b + 1)),
+                                                                          aa / (batch_size * (b + 1))), DEFAULT_LOG_ENV)
+                        epoch_loss, epoch_acc = cc / float(sample_size), aa / float(sample_size)
+                        training_loss.append(epoch_loss)
+
+                        output_val, epoch_val_loss, epoch_val_acc = sess.run([net.output, net.loss, net.accuracy],
+                                                                             feed_dict={net.x: valX, net.y: valY})
+                        pred.append(output_val)
+                        val_loss.append(epoch_val_loss)
+
+                        # Displaying training info for the epoch
+                        if (e + 1) % display_step == 0:
+                            text_to_print = "Training time: {}  ======== Loss: {:.4f} Accuracy: {:.4f} val_Loss: {:.4f} val_acc: {:.4f} ".format(
+                                round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_loss,
+                                epoch_val_acc)
+                            log(text_to_print, DEFAULT_LOG_ENV)
+
+                        # Saving the model
+                        if (e + 1) % save_step == 0:
+                            net.save(sess, model_ckpt_path, verbose=True, epoch=e + 1, write_meta_graph=True)
+
+                        # Adding values to summary
+                        # todo should'nt we consider valX and valY here ?
+                        summary_str = sess.run(net.summary_op, feed_dict={net.x: x_b, net.y: y_b})
+                        writer.add_summary(summary_str, sess.run(net.global_step))
+
+                    net.save(sess, model_ckpt_path, verbose=True, epoch=epochs, write_meta_graph=True)
+
+                    writer.close()
+
+                    if is_bayesian:
+                        # Sample from the last NB_OF_EPOCHS_FOR_BAYESIAN epochs to form Bayesian learning: average across last 10 epochs of predictions
+                        return (np.mean(pred[-NB_OF_EPOCHS_FOR_BAYESIAN:], axis=0), training_loss, val_loss)
+                    else:
+                        return (pred[-1], training_loss, val_loss)
+
+    # # graph = tf.Graph().as_default() if not restore else tf.get_default_graph()
+    # graph = tf.Graph().as_default()
+    # with graph:
+    #     with tf.variable_scope(net.name):
+    #         with sess:
+    #             # Builds the operations (output, train_op, accuracy... ) or restores them
+    #             # if restore:
+    #             #     # model_ckpt_path_to_restore = model_ckpt_path_to_restore or
+    #             #     assert model_ckpt_path_to_restore is not None,'model_ckpt_path_to_restore must not be None if restore is True'
+    #             #     net.restore_importants_ops(model_ckpt_path_to_restore)
+    #             # else:
+    #             net.build_operations(**kwargs)
+    #             if not restore:
+    #                 sess.run(net.init)
+    #             writer = tf.summary.FileWriter('logs', sess.graph)
+    #
+    #             training_loss, val_loss, pred = [], [], []
+    #             for e in range(epochs):
+    #                 # Display the epoch beginning
+    #                 if (e + 1) % display_step == 0:
+    #                     text_to_print = '\n***************** Epoch: {:03d}/{:03d} *****************'.format(e + 1, epochs)
+    #                     log(text_to_print, DEFAULT_LOG_ENV)
+    #
+    #                 epoch_start_time = time.time()
+    #
+    #                 # Shuffle dataset before doing an epoch of training # todo see if we delete it
+    #                 Z = list(zip(X, Y))
+    #                 random.shuffle(Z)
+    #                 X, Y = zip(*Z)
+    #
+    #                 # X,Y = np.asarray(X),np.asarray(Y) # todo se when necessary
+    #
+    #                 cc, aa = 0, 0
+    #                 for b in range(nb_of_batches_training):
+    #                     x_b, y_b = UtilsTraining._extract_minibatch(X, Y, batch_size=batch_size, current_batch=b)
+    #                     sess.run([net.optimizer, net.global_step], feed_dict={net.x: x_b, net.y: y_b})
+    #
+    #                     # Make evaluation on a batch basis
+    #                     c, a = sess.run([net.loss, net.accuracy], feed_dict={net.x: x_b, net.y: y_b})
+    #                     cc += (c * len(y_b))  # len(y_b) since the last batch can be of size smaller than batch size
+    #                     aa += (a * len(y_b))
+    #                     if (b + 1) % max(int(0.1 * nb_of_batches_training), 1) == 0:
+    #                         log('Batch {}/{} done ***  CumLoss'
+    #                             ': {:.4f} CumAccuracy: {:.4f}'.format(b + 1, nb_of_batches_training,
+    #                                                                   cc / (batch_size * (b + 1)),
+    #                                                                   aa / (batch_size * (b + 1))), DEFAULT_LOG_ENV)
+    #                 epoch_loss, epoch_acc = cc / float(sample_size), aa / float(sample_size)
+    #                 training_loss.append(epoch_loss)
+    #
+    #                 output_val, epoch_val_loss, epoch_val_acc = sess.run([net.output, net.loss, net.accuracy],
+    #                                                                      feed_dict={net.x: valX, net.y: valY})
+    #                 pred.append(output_val)
+    #                 val_loss.append(epoch_val_loss)
+    #
+    #                 # Displaying training info for the epoch
+    #                 if (e + 1) % display_step == 0:
+    #                     text_to_print = "Training time: {}  ======== Loss: {:.4f} Accuracy: {:.4f} val_Loss: {:.4f} val_acc: {:.4f} ".format(
+    #                         round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_loss,
+    #                         epoch_val_acc)
+    #                     log(text_to_print, DEFAULT_LOG_ENV)
+    #
+    #                 # Saving the model
+    #                 if (e + 1) % save_step == 0:
+    #                     net.save(sess, model_ckpt_path, verbose=True, epoch=e + 1,write_meta_graph=True)
+    #
+    #                 # Adding values to summary
+    #                 # todo should'nt we consider valX and valY here ?
+    #                 summary_str = sess.run(net.summary_op, feed_dict={net.x: x_b, net.y: y_b})
+    #                 writer.add_summary(summary_str, sess.run(net.global_step))
+    #
+    #             net.save(sess, model_ckpt_path, verbose=True, epoch=epochs + 1, write_meta_graph=True)
+    #
+    #             writer.close()
+    #
+    #             if is_bayesian:
+    #                 # Sample from the last NB_OF_EPOCHS_FOR_BAYESIAN epochs to form Bayesian learning: average across last 10 epochs of predictions
+    #                 return (np.mean(pred[-NB_OF_EPOCHS_FOR_BAYESIAN:], axis=0), training_loss, val_loss)
+    #             else:
+    #                 return (pred[-1], training_loss, val_loss)
+
+
+# todo do a function only for predictions ?
 
 def get_confusion_matrix(ytrue, ypred):
     # Create confusion matrix based on true results ytrue and predicted result ypred

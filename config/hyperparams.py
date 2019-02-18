@@ -83,6 +83,7 @@ GoogleNet_hyperparams = {'first_block':first_block_gglnet_hyperparam,
                          'inception_1':inception1_hyperparam,
                          'inception_2':inception2_hyperparam,
                          'inception_3':inception3_hyperparam,
+                         'dropout':0.15,
 }
 
 VAE_hyperparam = {

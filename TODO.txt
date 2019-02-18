@@ -5,6 +5,7 @@
 **Training
     - Code the save/restore part with the tensorflow saver and understand how to use it optimally
     - Learn how to use the cloud to actually train the model
+    - use tf.add_to_collection and tf.get_collections in order to restore a model properly
 
 **Dataprocessing:
     - allow for different targets than VWAP returns (close prices ??)

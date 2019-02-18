@@ -1,5 +1,6 @@
 import tensorflow as tf
 import random
+import numpy as np
 
 
 
@@ -73,7 +74,7 @@ class UtilsTraining:
         #     print(batch_size, current_batch, x_b)
         if len(x_b)==0: # todo need to change
             x_b,y_b = X[:batch_size],Y[:batch_size]
-        return x_b, y_b
+        return np.asarray(x_b), np.asarray(y_b)
 
     @staticmethod
     def next_batch(X, Y, batch_size, current_batch):

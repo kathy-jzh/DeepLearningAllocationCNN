@@ -240,7 +240,8 @@ class Net:
     def save(self, sess:tf.Session,model_ckpt_path:str,verbose=False,epoch=None,write_meta_graph=True):
 
         if verbose:
-            msg = 'Saving Model to {}, global step = {}'.format(model_ckpt_path,self.global_step.eval(sess))
+            msg = 'Saving Model to {}'.format(model_ckpt_path)
+            msg+= ', global step = {}'.format(self.global_step.eval(session=sess))
             msg = msg +' epoch: {}'.format(epoch) if epoch else msg
             log(msg,environment=DEFAULT_LOG_ENV)
         self.saver.save(sess, model_ckpt_path, self.global_step,write_meta_graph=write_meta_graph)
@@ -254,18 +255,22 @@ class Net:
             tf.summary.scalar("validation_error", (1.0 - accuracy))
             self.accuracy = accuracy
 
-    def build_operations(self, **kwargs):
+    def restore_importants_ops(self,sess,model_ckpt_path_to_restore):
+        raise NotImplementedError('Should be implemented in the child class since this is model dependent')
+
+    def build_operations(self,**kwargs):
         """
         Builds all operations that will be run within the session
         :param kwargs: union (as a dict) of all arguments necessary for the functions below
         :return:
         """
         self.x = tf.placeholder(tf.float32, self._shape_x, name='x')
+        # tf.add_to_collection('x',self.x)
         self.y = tf.placeholder(tf.float32, self._shape_y, name='y')
         self._inference(**kwargs)  # example: dropout
         self._xentropy_loss_func(**kwargs)  # example: expected_penalty
 
-        self.global_step = tf.Variable(0, trainable=False)
+        self.global_step = tf.Variable(0, trainable=False,name='global_step')
         self._optimize()  # todo see if we can do in a different way for the optimizer
         self._accuracy_func()
         self.summary_op = tf.summary.merge_all()
@@ -274,5 +279,6 @@ class Net:
         max_save_to_keep = kwargs.get('max_save_to_keep', 4)
         self.saver =  tf.train.Saver(max_to_keep=kwargs.get('max_save_to_keep',4))
         log('Saver will keep the last {} latest models'.format(max_save_to_keep),DEFAULT_LOG_ENV)
+
 
 

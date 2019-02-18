@@ -1,5 +1,9 @@
 import tensorflow as tf
+import os
+
 from models.net import Net
+from utils import log
+from config.hyperparams import DEFAULT_LOG_ENV
 
 # todo do functions for every block so that the graph is easier to read
 
@@ -17,10 +21,10 @@ class CondensedGoogLeNet(Net):
     def _inference(self,**kwargs):
         inputs = self.x
         try:
-            dropout = kwargs['dropout']
+            dropout = self._hyperparams['dropout']
         except KeyError as e:
-            print('dropout not found in kwargs, dropout must be specified for inference method in CondensedGoogLeNet')
-            raise e
+            log('dropout not found in hyperparams, dropout default will be 0.15',loglevel='warning',environment=DEFAULT_LOG_ENV)
+            dropout = 0.15
 
 
         hyperparams_first_blocks = self._hyperparams['first_block']
@@ -62,6 +66,28 @@ class CondensedGoogLeNet(Net):
         self.output = outputs
         # return x, outputs
 
+    def restore_importants_ops(self,sess,model_ckpt_path_to_restore):
+        saver = tf.train.import_meta_graph(model_ckpt_path_to_restore)
+        folder = os.path.dirname(model_ckpt_path_to_restore)
+        saver.restore(sess, tf.train.latest_checkpoint(folder))
+
+        graph = tf.get_default_graph()
+        # print(graph.get_operations())
+
+        self.x = graph.get_tensor_by_name('{}/x:0'.format(self.name))
+        self.y = graph.get_tensor_by_name('{}/y:0'.format(self.name))
+
+        self._pre_thresholded_output = graph.get_tensor_by_name('{}/dense_layer/BiasAdd:0'.format(self.name))
+        self.output = graph.get_tensor_by_name('{}/output:0'.format(self.name))
+        self.loss = graph.get_tensor_by_name('{}/loss/Mean:0'.format(self.name))
+
+        self.global_step = graph.get_tensor_by_name('{}/global_step:0'.format(self.name))
+        self.optimizer = graph.get_tensor_by_name('{}/minimize:0'.format(self.name))
+        self.accuracy = graph.get_tensor_by_name('{}/accuracy/Mean:0'.format(self.name))
+        self.summary_op = graph.get_tensor_by_name('{}/Merge/MergeSummary:0'.format(self.name))
+        # self.init = graph.get_tensor_by_name('{}/init:0'.format(self.name))
+        # self.init = tf.global_variables_initializer()
+        self.saver = saver
 
 # todo adapt this class to the new Net interface
 class CondensedAlexNet(Net):
