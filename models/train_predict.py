@@ -57,9 +57,10 @@ def train_predict(X, Y, valX, valY,
 
 
     if restore:
-
+        tf.reset_default_graph()
         sess = tf.Session()
         graph = tf.get_default_graph()
+        # with tf.variable_scope(net.name, reuse=True):
         net.restore_importants_ops(sess, model_ckpt_path_to_restore)
 
 
@@ -102,6 +103,8 @@ def train_predict(X, Y, valX, valY,
 
             output_val, epoch_val_loss, epoch_val_acc = sess.run([net.output, net.loss, net.accuracy],
                                                                  feed_dict={net.x: valX, net.y: valY})
+            rows_conf_matrix = ['{}\n'.format(row_i) for row_i in get_confusion_matrix(valY, output_val)]
+            log('Confusion Matrix : \n ' + ''.join(rows_conf_matrix), environment=DEFAULT_LOG_ENV)
             pred.append(output_val)
             val_loss.append(epoch_val_loss)
 
@@ -121,7 +124,7 @@ def train_predict(X, Y, valX, valY,
             summary_str = sess.run(net.summary_op, feed_dict={net.x: x_b, net.y: y_b})
             writer.add_summary(summary_str, sess.run(net.global_step))
 
-        net.save(sess, model_ckpt_path, verbose=True, epoch=epochs, write_meta_graph=True)
+        net.save(sess, model_ckpt_path, verbose=True, epoch=epochs, write_meta_graph=False)
 
         writer.close()
 
@@ -130,6 +133,8 @@ def train_predict(X, Y, valX, valY,
             return (np.mean(pred[-NB_OF_EPOCHS_FOR_BAYESIAN:], axis=0), training_loss, val_loss)
         else:
             return (pred[-1], training_loss, val_loss)
+
+
     else:
 
         with tf.Graph().as_default():
@@ -176,6 +181,8 @@ def train_predict(X, Y, valX, valY,
 
                         output_val, epoch_val_loss, epoch_val_acc = sess.run([net.output, net.loss, net.accuracy],
                                                                              feed_dict={net.x: valX, net.y: valY})
+                        rows_conf_matrix = ['{}\n'.format(row_i) for row_i in get_confusion_matrix(valY, output_val)]
+                        log('Confusion Matrix : \n ' + ''.join(rows_conf_matrix), environment=DEFAULT_LOG_ENV)
                         pred.append(output_val)
                         val_loss.append(epoch_val_loss)
 

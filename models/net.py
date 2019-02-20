@@ -222,7 +222,7 @@ class Net:
         try:
             tf_optimizer = self._hyperparams['tf_optimizer']
         except KeyError:
-            log('tf_optimizer was not specified in hyperparams, using default:{}'.format(DEFAULT_TF_OPTIMIZER),
+            log('tf_optimizer was not specisefied in hyperparams, using default:{}'.format(DEFAULT_TF_OPTIMIZER),
                 loglevel='warning',environment=DEFAULT_LOG_ENV)
             tf_optimizer = DEFAULT_TF_OPTIMIZER
         if tf_optimizer.lower() == 'adam':

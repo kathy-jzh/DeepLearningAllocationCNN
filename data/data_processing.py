@@ -14,7 +14,7 @@ class DataHandler:
     def __init__(self, encoding_method='GADF', window_len=64, image_size=16, retrain_freq=5,
                  start_date: int = DEFAULT_START_DATE,
                  end_date: int = DEFAULT_END_DATE, frac_of_stocks=1., stock_data_dir_path: str = 'data',
-                 dir_for_samples='data/cnn_samples/regular', nb_of_stocks_by_file=50
+                 dir_for_samples='data/cnn_samples/regular', nb_of_stocks_by_file=50, kwargs_target_methods=None
                  ):
 
         self._window_len = window_len
@@ -22,6 +22,7 @@ class DataHandler:
         self._retrain_freq = retrain_freq
         self._encoding_method = encoding_method
         self._targets_methods = ['VWAP']
+        self._kwargs_target_methods = kwargs_target_methods or {}
 
         self._start_date = start_date
         self._end_date = end_date
@@ -101,7 +102,7 @@ class DataHandler:
                                                           use_smoothed_data=use_smoothed_data)
             # build targets
             dict_targets = self._get_targets_one_batch(df_batch_data, batch_name)
-            dict_to_pickle.update({**dict_targets, 'df_original_data': df_batch_data})
+            dict_to_pickle.update({**dict_targets, 'df_original_data': df_batch_data,'first_date':df_batch_data.index[0],'last_date':df_batch_data.index[-1]})
 
             dump_pickle(dict_to_pickle, os.path.join(self._directory_for_samples, batch_name))
 
@@ -139,7 +140,7 @@ class DataHandler:
             if method == 'VWAP':
                 # TODO put the up and down returns as params
                 labels_array = self._build_VWAP_returns(df_batch_data, self._window_len, self._retrain_freq,
-                                                        up_return=0.0125, down_return=-0.0125)
+                                                        **self._kwargs_target_methods)
                 dict_targets.update({'VWAP_targets': labels_array})
             elif method == 'close':
                 labels_array = None  # todo
@@ -309,6 +310,8 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
         path = os.path.join(samples_path, file_name)
         dict_from_pickle = load_pickle(path, logger_env=logger_env)
 
+        log('first_date: {}, last_date: {}'.format(dict_from_pickle['first_date'],dict_from_pickle['last_date']),environment=logger_env)
+
         X = dict_from_pickle['samples']
         Y = dict_from_pickle[targets_type]
         n_samples = dict_from_pickle['n_samples']
@@ -334,16 +337,18 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
             X_test = np.concatenate([X_test, X[:round(n_samples * train_size)]])
             Y_test = np.concatenate([Y_test, Y[:round(n_samples * train_size)]])
 
+
+    # Distributions of Labels
     train_d = np.sum(Y_train, axis=0) / len(Y_train)
     val_d = np.sum(Y_val, axis=0) / len(Y_val)
     tst_d = np.sum(Y_test, axis=0) / len(Y_test)
 
-    text = 'long: {:5.2f}%, hold: {:5.2f}%, short: {:5.2f}%'
-    log('Training Distribution of Labels :' + text.format(train_d[0] * 100, train_d[1] * 100, train_d[2] * 100),
+    text_template = 'long: {:5.2f}%, hold: {:5.2f}%, short: {:5.2f}%'
+    log('Training Distribution of Labels :' + text_template.format(train_d[0] * 100, train_d[1] * 100, train_d[2] * 100),
         environment=logger_env)
-    log('Validation Distribution of Labels :' + text.format(val_d[0] * 100, val_d[1] * 100, val_d[2] * 100),
+    log('Validation Distribution of Labels :' + text_template.format(val_d[0] * 100, val_d[1] * 100, val_d[2] * 100),
         environment=logger_env)
-    log('Test Distribution of Labels :' + text.format(tst_d[0] * 100, tst_d[1] * 100, tst_d[2] * 100),
+    log('Test Distribution of Labels :' + text_template.format(tst_d[0] * 100, tst_d[1] * 100, tst_d[2] * 100),
         environment=logger_env)
 
     return X_train, X_val, X_test, Y_train, Y_val, Y_test
