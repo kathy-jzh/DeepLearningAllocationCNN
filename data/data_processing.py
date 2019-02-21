@@ -22,6 +22,7 @@ class DataHandler:
         self._retrain_freq = retrain_freq
         self._encoding_method = encoding_method
         self._targets_methods = ['VWAP']
+        # self._features = ['']
         self._kwargs_target_methods = kwargs_target_methods or {}
 
         self._start_date = start_date

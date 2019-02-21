@@ -24,7 +24,6 @@
 
 **Modify the function next_batch and add options:
     - shuffle at each minibatch
-    - go over the whole dataset during the epoch (what is actually done with the shuffling at each epoch)
 
 
 ** Implement other structures

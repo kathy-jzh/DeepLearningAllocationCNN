@@ -89,6 +89,9 @@ class CondensedGoogLeNet(Net):
         # self.init = tf.global_variables_initializer()
         self.saver = saver
 
+# class ResNet:
+#     def __init__(self):
+
 # todo adapt this class to the new Net interface
 class CondensedAlexNet(Net):
     """ A parametrically reduced version of AlexNet (For full version of AlexNet, see Krizhevsky (2012))

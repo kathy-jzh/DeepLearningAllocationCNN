@@ -59,7 +59,7 @@ def train_predict(X, Y, valX, valY,
 
     if restore:
         tf.reset_default_graph()
-        sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+        sess = tf.Session()
         graph = tf.get_default_graph()
         # with tf.variable_scope(net.name, reuse=True):
         net.restore_importants_ops(sess, model_ckpt_path_to_restore)
@@ -130,7 +130,7 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
             log(text_to_print, DEFAULT_LOG_ENV)
 
         # Saving the model
-        if (e + 1) % save_step == 0 and save_step>=1:
+        if save_step>=1 and (e + 1) % save_step == 0 :
             net.save(sess, model_ckpt_path, verbose=True, epoch=e + 1, write_meta_graph=(not restore))
 
         # Adding values to summary
