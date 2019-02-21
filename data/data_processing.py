@@ -230,6 +230,17 @@ class DataHandler:
         # raise NotImplementedError('Not yet implemented')
         return df
 
+    # TODO this function should build a df with the new features we want
+    def _get_features(self):
+        # shoudl call at least _get_high_low_feature and the functions that gets returns
+        pass
+
+    # TODO this function should take a df with BIDLO and ASKHI and return a df with
+            # todo : (PRC - BIDLO)/PRC and (ASKHI - PRC) / PRC
+    @staticmethod
+    def _get_high_low_feature():
+        pass
+
     def __delete_df_data_from_memory(self):
         self.df_data = None
 
