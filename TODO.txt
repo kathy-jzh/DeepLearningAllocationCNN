@@ -14,10 +14,13 @@
 
     - build different targets according to the level of returns (ex put the threshold at +1% so that maybe we can capt more trends and not only special events)
     - should we think about getting returns before GADF ?
+    - Build functions (static_method first) to build the right features from the raw dataframe retrieved on CRSP
+            + Simple: example bid-ask spread, returns ...
 
     # TODO functions:
     _get_data_from_stocks in data_processing
     _build_close_returns in data_processing
+
 
 **Modify the function next_batch and add options:
     - shuffle at each minibatch
@@ -28,7 +31,7 @@
     - ResNET
     - try to smooth the data beforehand (Fourrier, Wavelet)
     - twist the hyperparameters
-    - increase the pooling filter size
+    - add batch normalization
 
     - tf.layers.conv2d use it with dilatation rate to identify patterns
 
