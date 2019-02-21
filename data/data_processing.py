@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from pyts.image import GADF, GASF, MTF
 from pykalman import KalmanFilter
 
-from utils import load_pickle, log, dump_pickle
+from utils import load_pickle, log, dump_pickle,remove_all_files_from_dir
 from config.hyperparams import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_START_DATE
 
 
@@ -84,13 +84,7 @@ class DataHandler:
         log('***** Dumping data in {} different files'.format(n_files_to_dump), environment=self._LOGGER_ENV)
 
         # Removing existing files in the folder
-        files_to_remove = os.listdir(self._directory_for_samples)
-        log('Removing existing files in the folder {}'.format(self._directory_for_samples),
-            environment=self._LOGGER_ENV)
-        for f in files_to_remove:
-            os.remove(os.path.join(self._directory_for_samples, f))
-        log('Files {} removed from folder {}'.format(files_to_remove, self._directory_for_samples),
-            environment=self._LOGGER_ENV)
+        remove_all_files_from_dir(self._directory_for_samples,logger_env=self._LOGGER_ENV)
 
         for batch in range(n_files_to_dump):
             batch_name = 'image_data_{}'.format(batch + 1)
@@ -104,7 +98,7 @@ class DataHandler:
             dict_targets = self._get_targets_one_batch(df_batch_data, batch_name)
             dict_to_pickle.update({**dict_targets, 'df_original_data': df_batch_data,'first_date':df_batch_data.index[0],'last_date':df_batch_data.index[-1]})
 
-            dump_pickle(dict_to_pickle, os.path.join(self._directory_for_samples, batch_name))
+            dump_pickle(dict_to_pickle, os.path.join(self._directory_for_samples, batch_name),logger_env=self._LOGGER_ENV)
 
         self.__delete_df_data_from_memory()
 
@@ -147,7 +141,7 @@ class DataHandler:
                 log('method close is not yet implemented!!!!!', environment=self._LOGGER_ENV, loglevel='error')
             else:
                 raise BaseException('So far the targets can only be computed by close prices or VWAP')
-        log('*****Targets for batch {} are built'.format(batch_name), environment=self._LOGGER_ENV)
+        log('Targets for batch {} are built'.format(batch_name), environment=self._LOGGER_ENV)
         return dict_targets
 
     @staticmethod

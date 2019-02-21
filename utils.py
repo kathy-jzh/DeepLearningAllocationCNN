@@ -1,18 +1,7 @@
 from ipyLogger import get_logger
 import sys
+import os
 import pickle
-
-
-def __get_ipython_func():
-    return sys.modules['__main__'].__dict__.get('get_ipython', None)
-
-
-def __is_in_ipython():
-    get_ipython = __get_ipython_func()
-    if get_ipython is None:
-        return False
-    else:
-        return get_ipython() is not None
 
 
 def log(msg, environment='', loglevel='info', **kwargs):
@@ -36,10 +25,21 @@ def log(msg, environment='', loglevel='info', **kwargs):
         print('{}.{}:  '.format(environment, loglevel.upper()), msg)
 
 
-def dump_pickle(obj, path: str, protocol=pickle.HIGHEST_PROTOCOL):
+def dump_pickle(obj, path: str, protocol=pickle.HIGHEST_PROTOCOL, logger_env=None):
+    """
+    :param obj: obj to pickle
+    :param path: path for the dump MUST BE with no suffix this function will automatically add '.pickle' in the name
+    :param protocol: protocol for the pickling
+    :param logger_env: for the logging
+    """
+    _ensure_or_make_dir(file_path=path, logger_env=logger_env)
     f = open(path + '.pickle', 'wb')
-    pickle.dump(obj, f, protocol=protocol)
-    f.close()
+    try:
+        pickle.dump(obj, f, protocol=protocol)
+    except Exception as e:
+        raise e
+    finally:
+        f.close()
 
 
 def load_pickle(path: str, logger_env='Pickles'):
@@ -58,3 +58,33 @@ def load_pickle(path: str, logger_env='Pickles'):
     f.close()
     log('Data unpickled, type: {}'.format(res.__class__), environment=logger_env)
     return res
+
+
+def remove_all_files_from_dir(directory, logger_env=None):
+    _ensure_or_make_dir(directory=directory, logger_env=logger_env)
+    files_to_remove = os.listdir(directory)
+    log('Removing existing files in the folder {}'.format(directory), environment=logger_env)
+    for f in files_to_remove:
+        os.remove(os.path.join(directory, f))
+    log('Files {} removed from folder {}'.format(files_to_remove, directory), environment=logger_env)
+
+
+def _ensure_or_make_dir(directory=None, file_path=None, logger_env=None):
+    assert (directory is not None) ^ (
+                file_path is not None), 'only one of the args: file_path or directory, must be none to test or make a directory'
+    directory = os.path.dirname(file_path) if file_path else directory
+    if not os.path.exists(directory):
+        log('Creating directory {}'.format(directory), environment=logger_env)
+        os.makedirs(directory)
+
+
+def __get_ipython_func():
+    return sys.modules['__main__'].__dict__.get('get_ipython', None)
+
+
+def __is_in_ipython():
+    get_ipython = __get_ipython_func()
+    if get_ipython is None:
+        return False
+    else:
+        return get_ipython() is not None
