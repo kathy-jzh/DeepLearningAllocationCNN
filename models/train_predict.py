@@ -96,7 +96,7 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
         random.shuffle(Z)
         X, Y = zip(*Z)
 
-        # X,Y = np.asarray(X),np.asarray(Y) # todo se when necessary
+        # X,Y = np.asarray(X),np.asarray(Y) # todo see when necessary
 
         cc, aa = 0, 0
         for b in range(nb_of_batches_training):
