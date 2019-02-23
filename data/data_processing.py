@@ -403,6 +403,7 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
 
         log('first_date: {}, last_date: {}'.format(df_all_data.index[0], df_all_data.index[-1]),
             environment=logger_env)
+        # in each of the pickle files the data is sorted in chronologic order
         X = np.concatenate([[sample for sample in df_all_data['sample'].values]], axis=0)  # need this to get an array
         Y = np.concatenate([[sample for sample in df_all_data[targets_type].values]], axis=0)
         n_samples = Y.shape[0]
