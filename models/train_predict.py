@@ -63,7 +63,7 @@ def train_predict(X, Y, valX, valY,
         graph = tf.get_default_graph()
         # with tf.variable_scope(net.name, reuse=True):
         net.restore_importants_ops(sess, model_ckpt_path_to_restore)
-
+        # todo sess.close ???
         return _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_training,batch_size,display_step,save_step,model_ckpt_path,is_bayesian)
 
     else:
@@ -96,7 +96,6 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
         random.shuffle(Z)
         X, Y = zip(*Z)
 
-        # X,Y = np.asarray(X),np.asarray(Y) # todo see when necessary
 
         cc, aa = 0, 0
         for b in range(nb_of_batches_training):

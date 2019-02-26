@@ -380,7 +380,8 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
                                 targets_type='VWAP_targets',
                                 train_val_size=2 / 3.,
                                 train_size=0.75,
-                                logger_env='Training'
+                                logger_env='Training',
+                                predict=False
                                 ):
     """
     :param samples_path: path for the folder with the data we need: only the files we need need to be in this folder
@@ -397,6 +398,12 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
                                                                                          len(list_file_names),
                                                                                          list_file_names[0]),
         logger_env)
+
+    # if predict:
+    #     columns_df_res = ['PRC', 'PERMNO']
+    #     df_all_data_for_predict = pd.DataFrame(columns=columns_df_res)
+    #     df_all_data_for_predict.index.name ='date'
+
     for i, file_name in enumerate(list_file_names):
         path = os.path.join(samples_path, file_name)
         df_all_data = load_pickle(path, logger_env=logger_env)
@@ -429,6 +436,8 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
 
             X_test = np.concatenate([X_test, X[stop_2:]])
             Y_test = np.concatenate([Y_test, Y[stop_2:]])
+        # if predict:
+
 
     # Distributions of Labels
     train_d = np.sum(Y_train, axis=0) / len(Y_train)
@@ -443,8 +452,10 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
         environment=logger_env)
     log('Test Distribution of Labels :' + text_template.format(tst_d[0] * 100, tst_d[1] * 100, tst_d[2] * 100),
         environment=logger_env)
-
-    return X_train, X_val, X_test, Y_train, Y_val, Y_test
+    if not predict:
+        return X_train, X_val, X_test, Y_train, Y_val, Y_test
+    # else:
+    #     return
 
 
 # def get_training_data_from_path(samples_path='data/cnn_samples/regular',
