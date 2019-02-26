@@ -13,7 +13,7 @@ from config.hyperparams import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_ST
 class DataHandler:
     def __init__(self, encoding_method='GADF', window_len=64, image_size=16, retrain_freq=5,
                  start_date: int = DEFAULT_START_DATE, targets_methods=['close'],
-                 end_date: int = DEFAULT_END_DATE, frac_of_stocks=1., stock_data_dir_path: str = 'data',
+                 end_date: int = DEFAULT_END_DATE, frac_of_stocks=1., stock_data_dir_path: str = 'data/2019_stock_data',
                  dir_for_samples='data/cnn_samples/regular', nb_of_stocks_by_file=50, kwargs_target_methods=None
                  ):
 
@@ -25,6 +25,8 @@ class DataHandler:
         # self._features = ['']
         self._kwargs_target_methods = kwargs_target_methods or {}
 
+        self._features = ['date','PRC','ASKHI','BIDLO','VOL']
+
         self._start_date = start_date
         self._end_date = end_date
         self._frac_of_stocks_to_get = frac_of_stocks
@@ -33,7 +35,7 @@ class DataHandler:
         self._directory_for_samples = dir_for_samples
         self._stock_data_dir_path = stock_data_dir_path
 
-        self._N_FILES_CRSP = 27
+        self._N_FILES_CRSP = 17
         self._LOGGER_ENV = 'image_encoding'
 
         self.df_data = None
@@ -50,16 +52,17 @@ class DataHandler:
 
         :return: Nothing
         """
+        # TODO instead of writing the files names here just get a list of names from the folder
         nb_files_to_get = max(round(self._frac_of_stocks_to_get * self._N_FILES_CRSP), 1)
         choices = np.random.choice(np.arange(1, self._N_FILES_CRSP + 1), nb_files_to_get, replace=False)
-        file_names = ['stockData_{}'.format(i) for i in choices]
+        file_names = ['stockdata_{}'.format(i) for i in choices]
         df_data = self._load_stock_data(file_names, data_dir_path=self._stock_data_dir_path,
                                         logger_env=self._LOGGER_ENV)
+        df_data = self._extract_features(df_data)
         df_data = self._get_data_from_stocks(df_data, ['10026'])  # todo
 
         self._stocks_list = np.unique(df_data.index)
-        log('Data finalized in attribute df_data, number of stocks {}'.format(len(self._stocks_list)),
-            environment=self._LOGGER_ENV)
+        self.log('Data finalized in attribute df_data, number of stocks {}'.format(len(self._stocks_list)))
         self.df_data = self._get_data_between_and_sort(df_data, self._start_date, self._end_date, self._LOGGER_ENV)
 
     def build_and_dump_images_and_targets(self, use_smoothed_data=False):
@@ -82,7 +85,7 @@ class DataHandler:
         nb_stocks = len(self._stocks_list)
         n_files_to_dump = nb_stocks // self._nb_of_stocks_by_file + ((nb_stocks % self._nb_of_stocks_by_file) != 0)
         df_data_multi_index = self.df_data.reset_index(drop=False).set_index(['PERMNO', 'date'])
-        log('***** Dumping data in {} different files'.format(n_files_to_dump), environment=self._LOGGER_ENV)
+        self.log('***** Dumping data in {} different files'.format(n_files_to_dump))
 
         # Removing existing files in the folder
         remove_all_files_from_dir(self._directory_for_samples, logger_env=self._LOGGER_ENV)
@@ -126,11 +129,11 @@ class DataHandler:
         pass
         # dict_targets = {}
         # log('***** Building Targets for batch {}, methods will be {}'.format(batch_name, self._targets_methods),
-        #     environment=self._LOGGER_ENV)
+        #    )
         # assert len(self._targets_methods) >= 1, 'The number of methods specified must be >=1'
         #
         # for method in self._targets_methods:
-        #     log('Target building method {}'.format(method), environment=self._LOGGER_ENV)
+        #     log('Target building method {}'.format(method),)
         #     if method == 'VWAP':
         #         # TODO put the up and down returns as params
         #         labels_array, df_for_backtest = self._build_VWAP_returns(df_batch_data, self._window_len,
@@ -145,7 +148,7 @@ class DataHandler:
         #
         #     else:
         #         raise BaseException('So far the targets can only be computed by close prices or VWAP')
-        # log('Targets for batch {} are built'.format(batch_name), environment=self._LOGGER_ENV)
+        # log('Targets for batch {} are built'.format(batch_name),)
         # return dict_targets
 
     @staticmethod
@@ -262,8 +265,8 @@ class DataHandler:
         return samples_list, dates_list, prc_list
 
     def _build_images_one_batch(self, df_batch_data, batch_name, use_smoothed_data=False):
-        log('Building Targets and Images for batch {}'.format(batch_name), environment=self._LOGGER_ENV)
-        log('Targets will be constructed with methods: {}'.format(self._targets_methods), environment=self._LOGGER_ENV)
+        self.log('Building Targets and Images for batch {}'.format(batch_name),)
+        self.log('Targets will be constructed with methods: {}'.format(self._targets_methods),)
 
         df_batch_data = df_batch_data.reset_index(drop=False).set_index(['PERMNO', 'date'])
         all_permnos = df_batch_data.index.levels[0]
@@ -303,7 +306,7 @@ class DataHandler:
             df_res_one_permno['PERMNO'] = permno
             df_res = pd.concat([df_res, df_res_one_permno])
 
-        log('Targets and Images for batch {} are built'.format(batch_name), environment=self._LOGGER_ENV)
+        self.log('Targets and Images for batch {} are built'.format(batch_name),)
 
         return df_res
 
@@ -315,9 +318,12 @@ class DataHandler:
         return df
 
     # TODO this function should build a df with the new features we want
-    def _get_features(self):
-        # shoudl call at least _get_high_low_feature and the functions that gets returns
-        pass
+    def _extract_features(self,df_data):
+        #TODO shoudl call at least _get_high_low_feature and the functions that gets returns
+        columns_to_get = self._features
+        return df_data[columns_to_get]
+
+
 
     # TODO this function should take a df with BIDLO and ASKHI and return a df with
     # todo : (PRC - BIDLO)/PRC and (ASKHI - PRC) / PRC
@@ -353,6 +359,27 @@ class DataHandler:
     @staticmethod
     def _load_stock_data(file_names: list = DEFAULT_FILES_NAMES, data_dir_path: str = 'data',
                          logger_env: str = 'Pickling'):
+        """
+
+        :param file_names:
+        :param data_dir_path:
+        :param logger_env:
+        :return: dataframe with all data: EXAMPLE
+
+        PERMNO(which is index)     date TICKER         COMNAM      DIVAMT  NSDINX   BIDLO  \
+        91707                  20100104    MVO        M V OIL TRUST     NaN     NaN  20.515
+        91707                  20100105    MVO        M V OIL TRUST     NaN     NaN  21.140
+        91707                  20100106    MVO        M V OIL TRUST     NaN     NaN  21.750
+
+
+        ASKHI      PRC       VOL    BID    ASK    sprtrn
+        21.1950  21.1501   86300.0  21.15  21.19  0.016043
+        21.5700  21.5700   70300.0  21.53  21.71  0.003116
+        22.2400  22.1900   62400.0  22.11  22.21  0.000546
+
+
+
+        """
         assert len(file_names) >= 1, 'the list of file names is <1'
         for i, file_name in enumerate(file_names):
             if i == 0:
@@ -366,8 +393,11 @@ class DataHandler:
                 df_res = pd.concat([df_res, df_temp])
 
         # df_res = df_res.reset_index(drop=False).set_index(['PERMNO', 'date'])
-
+        df_res = df_res.set_index('PERMNO')
         return df_res
+
+    def log(self,msg):
+        log(msg,environment=self._LOGGER_ENV)
 
     @staticmethod
     def _extract_data_for_stocks(df_data_multi_ind: pd.DataFrame, list_stocks: list):
