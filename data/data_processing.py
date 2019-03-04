@@ -60,6 +60,7 @@ class DataHandler:
                                         logger_env=self._LOGGER_ENV)
         df_data = self._extract_features(df_data)
         df_data = self._get_data_from_stocks(df_data, ['10026'])  # todo
+        df_data  = self.__rectify_prices(df_data)
 
         self._stocks_list = np.unique(df_data.index)
         self.log('Data finalized in attribute df_data, number of stocks {}'.format(len(self._stocks_list)))
@@ -183,6 +184,11 @@ class DataHandler:
 
         return np.asarray(targets), df_for_backtest
 
+    def __rectify_prices(self,df_data):
+        self.log('Rectifying {} negative prices out of {} prices'.format(len(df_data[df_data.PRC<=0]),len(df_data.PRC)))
+        df_data.PRC = np.abs(df_data.PRC)
+        return df_data
+
     @staticmethod
     def _build_VWAP_returns(df, window_len=64, retrain_freq=5, up_return=0.0125, down_return=-0.0125):
         data = df[['PRC', 'VOL']]
@@ -231,7 +237,7 @@ class DataHandler:
         samples_list, dates_list, prc_list = [], [], []
         for i in range(window_len, n_days, retrain_freq):
             window_data = df_one_permno.T.iloc[:, i - window_len:i]
-            date = df_one_permno.index[i]
+            date = df_one_permno.index[i-1]
             dates_list.append(date)
             prc_list.append(df_one_permno.loc[date, 'PRC'])
 
@@ -437,6 +443,7 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
     for i, file_name in enumerate(list_file_names):
         path = os.path.join(samples_path, file_name)
         df_all_data = load_pickle(path, logger_env=logger_env)
+        df_all_data = df_all_data.sort_index() # In case it is not sorted
 
         log('first_date: {}, last_date: {}'.format(df_all_data.index[0], df_all_data.index[-1]),
             environment=logger_env)
@@ -468,12 +475,11 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
             Y_test = np.concatenate([Y_test, Y[stop_2:]])
         # if predict:
 
-
+    log('Nb of Samples in training:{}, validation: {}, test:{}'.format( len(Y_train), len(Y_val), len(Y_test)), environment=logger_env)
     # Distributions of Labels
     train_d = np.sum(Y_train, axis=0) / len(Y_train)
     val_d = np.sum(Y_val, axis=0) / len(Y_val)
     tst_d = np.sum(Y_test, axis=0) / len(Y_test)
-
     text_template = 'long: {:5.2f}%, hold: {:5.2f}%, short: {:5.2f}%'
     log('Training Distribution of Labels :' + text_template.format(train_d[0] * 100, train_d[1] * 100,
                                                                    train_d[2] * 100),
