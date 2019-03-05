@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 import os
+import ezhc as hc
 
 from utils import load_pickle, log
 from data.data_processing import DataHandler, get_training_data_from_path
@@ -19,7 +20,6 @@ class Backtester:
         self._end_date = end_date
         # we need to restore the output op and just to use this one to get the pred
 
-        # self._handler = DataHandler() # Todo add param, actually we will not need it since we have everything in trainig all data
 
         self._df_all_data = None
         self._output = None
@@ -30,11 +30,20 @@ class Backtester:
 
     def run_backtest(self):
         X = self.get_df_all_data()
+        print(X.shape)
         pred = self.run_predictions(X)
         self._make_df_for_bckt(pred)
 
         df_backt_results = self._run_strategy()
-        return df_backt_results ## TODO see if we keep it as an attribute
+        df_strats = df_backt_results.astype(np.float64)
+        df_strats.index.name='date'
+        df_strats['Cash'] = 1.03**(5./252.)
+        df_strats = df_strats.reset_index()
+        df_strats.date = pd.to_datetime(df_strats.date.apply(lambda x: '{}-{}-{}'.format(str(x)[:4],str(x)[4:6],str(x)[6:])))
+        df_strats = df_strats.set_index('date')
+        self.df_strats = df_strats.cumprod()
+
+
 
     def _run_strategy(self):
         """ Uses the dataframe with all data: Example below, to make a backtest
@@ -51,7 +60,7 @@ class Backtester:
         """
         # TODO modify the function to support different strategies, make a column weights in df_permnos_to_buy
         df_data = self._df_all_data
-        strategies = ['10_max_long', '20_max_long']
+        strategies = ['10_max_long', '20_max_long','2_max_long']
         self._df_permnos_to_buy = self.__create_signals(df_data,strategies=strategies)
         self._df_permnos_to_buy = self._df_permnos_to_buy.shift(1).dropna()
 
@@ -61,11 +70,11 @@ class Backtester:
         df_rets = df_rets.dropna().PRC
 
         # Run the backtest with the returns and the predictions
+        self.log('Running Backtest')
         df_results = pd.DataFrame(columns=strategies,index=self._df_permnos_to_buy.index)
         for date in self._df_permnos_to_buy.index:
             for strat in strategies:
                 list_permnos_to_buy = self._df_permnos_to_buy.loc[date][strat]
-                print(df_rets.loc[date][list_permnos_to_buy].mean())
                 df_results.loc[date][strat] = df_rets.loc[date][list_permnos_to_buy].mean()
         return df_results
 
@@ -88,18 +97,20 @@ class Backtester:
         df_permnos_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
         for date in df_data.index:
             for strat in strategies:
+                data_sorted = df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
+                            by='long', ascending=False)
                 if strat=='10_max_long':
-                    list_permons_to_buy = list(
-                        df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
-                            by='long', ascending=False).index[:10])
+                    list_permons_to_buy = list(data_sorted.index[:10])
                     df_permnos_to_buy.loc[date][strat] = list_permons_to_buy
                 elif strat=='20_max_long':
-                    list_permons_to_buy = list(
-                        df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
-                            by='long', ascending=False).index[:20])
+                    list_permons_to_buy = list(data_sorted.index[:20])
+                    df_permnos_to_buy.loc[date][strat] = list_permons_to_buy
+                elif strat=='2_max_long':
+                    list_permons_to_buy = list(data_sorted.index[:2])
                     df_permnos_to_buy.loc[date][strat] = list_permons_to_buy
                 else:
                     raise NotImplementedError('The strategy {} is not implemented'.format(strat))
+        self.log('Signals created')
         return df_permnos_to_buy
     # use df_all_data and builds a df with dates and a return value (first value is one)
 
@@ -120,6 +131,7 @@ class Backtester:
         :param pred: numpy array shape (N_samples,3)
         :return: Nothing
         """
+        self.log('Joining prices data and predictions')
         df_signals = pd.DataFrame(index=self._df_all_data.index, data=pred, columns=['long', 'hold', 'short'])
         self._df_all_data = pd.concat([self._df_all_data, df_signals], axis=1)
         self._df_all_data = self._df_all_data.sort_index()
@@ -149,10 +161,41 @@ class Backtester:
         sess = tf.Session()
         graph = tf.get_default_graph()
         self.restore_output_op(sess)
+        self.log('Model Restored, launching output operation')
         pred = sess.run(self._output, feed_dict={self._x: X})
+        self.log('Predictions computed')
         sess.close()
         return pred
         # must run ouput and add the predictions in the dataframe df_all_data as 3 columns
+
+    def plot_backtest(self,cash_rate = 1.04**(5./252.)):
+        g = hc.Highstock()
+
+        g.chart.width = 1000
+        g.chart.height = 600
+        g.legend.enabled = True
+        g.legend.layout = 'horizontal'
+        g.legend.align = 'center'
+        g.legend.maxHeight = 100
+        g.tooltip.enabled = True
+        g.tooltip.valueDecimals = 2
+        g.exporting.enabled = True
+
+        g.chart.zoomType = 'xy'
+        g.title.text = 'Backtest for different strategies'
+        g.subtitle.text = 'Subtitle ? '
+
+        g.plotOptions.series.compare = 'percent'
+
+        g.xAxis.gridLineWidth = 1.0
+        g.xAxis.gridLineDashStyle = 'Dot'
+        g.yAxis.gridLineWidth = 1.0
+        g.yAxis.gridLineDashStyle = 'Dot'
+
+
+        g.series = hc.build.series(self.df_strats)
+
+        return g.plot_with_table_1(save=False, dated=True, version='latest')
 
     def get_df_all_data(self):
         samples_path = self._path_data
@@ -168,10 +211,10 @@ class Backtester:
         for i, file_name in enumerate(list_file_names):
             path = os.path.join(samples_path, file_name)
             df_all_data_one_batch = load_pickle(path, logger_env=self.__LOGGER_ENV)
-            log('first_date: {}, last_date: {}'.format(df_all_data_one_batch.index[0], df_all_data_one_batch.index[-1]),
-                environment=self.__LOGGER_ENV)
+            self.log('first_date: {}, last_date: {}'.format(df_all_data_one_batch.index[0], df_all_data_one_batch.index[-1]))
             # Keeping only the dates we want for the backtest
             df_all_data_one_batch = df_all_data_one_batch.loc[self._start_date:self._end_date]
+            self.log('new first_date: {}, new last_date: {}'.format(df_all_data_one_batch.index[0], df_all_data_one_batch.index[-1]))
 
             # in each of the pickle files the data is sorted in chronologic order we resort in case it is not
             df_all_data_one_batch = df_all_data_one_batch.sort_index()
