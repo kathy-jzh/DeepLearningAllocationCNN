@@ -4,7 +4,7 @@ import tensorflow as tf
 import os
 import ezhc as hc
 
-from utils import load_pickle, log,plot_highstock_with_table
+from utils import load_pickle, log,plot_highstock_with_table,integer_to_timestamp_date_index
 from data.data_processing import DataHandler, get_training_data_from_path
 
 
@@ -36,13 +36,20 @@ class Backtester:
         df_backt_results = self._run_strategy()
 
         df_strats = df_backt_results.astype(np.float64)
-        df_strats.index.name='date'
-        df_strats['Cash'] = 1.03**(5./252.)
-        df_strats = df_strats.reset_index()
-        df_strats.date = pd.to_datetime(df_strats.date.apply(lambda x: '{}-{}-{}'.format(str(x)[:4],str(x)[4:6],str(x)[6:])))
-        df_strats = df_strats.set_index('date')
-        self.df_strats = df_strats.cumprod()
+        df_strats = integer_to_timestamp_date_index(df_strats)
+        # df_strats['Cash'] = 1.03**(5./252.)
+        df_strats = df_strats.cumprod()
 
+        # we get SPX data and add it to the dataframe
+        df_spx = pd.read_csv('data/^GSPC.csv', index_col=0, usecols=['Date', 'Close'])
+        df_spx.index.name = 'date'
+        df_spx.columns = ['Cash'] # Columns that will be used to compute sharpe ratio
+        df_spx.index = pd.to_datetime(df_spx.index)
+        df_strats = pd.merge(df_strats, df_spx, how='left', on='date')
+        df_strats['Cash'] = df_strats['Cash']/df_strats['Cash'].iloc[0]
+
+
+        self.df_strats = df_strats
 
 
     def _run_strategy(self):

@@ -3,9 +3,10 @@ import sys
 import os
 import pickle
 import ezhc as hc
+import pandas as pd
 
 
-def plot_highstock_with_table(df,title=''):
+def plot_highstock_with_table(df, title=''):
     # Todo add more args
     g = hc.Highstock()
 
@@ -33,6 +34,15 @@ def plot_highstock_with_table(df,title=''):
     g.series = hc.build.series(df)
 
     return g.plot_with_table_1(save=False, dated=True, version='latest')
+
+
+def integer_to_timestamp_date_index(df):
+    df.index.name = 'date'
+    df = df.reset_index()
+    df.date = pd.to_datetime(df.date.apply(lambda x: '{}-{}-{}'.format(str(x)[:4], str(x)[4:6], str(x)[6:])))
+    df = df.set_index('date')
+    return df
+
 
 def log(msg, environment='', loglevel='info', **kwargs):
     """"""
@@ -101,7 +111,7 @@ def remove_all_files_from_dir(directory, logger_env=None):
 
 def _ensure_or_make_dir(directory=None, file_path=None, logger_env=None):
     assert (directory is not None) ^ (
-                file_path is not None), 'only one of the args: file_path or directory, must be none to test or make a directory'
+            file_path is not None), 'only one of the args: file_path or directory, must be none to test or make a directory'
     directory = os.path.dirname(file_path) if file_path else directory
     if not os.path.exists(directory):
         log('Creating directory {}'.format(directory), environment=logger_env)
