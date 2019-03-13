@@ -10,7 +10,7 @@ def plot_highstock_with_table(df, title=''):
     # Todo add more args
     g = hc.Highstock()
 
-    g.chart.width = 1000
+    g.chart.width = 900
     g.chart.height = 600
     g.legend.enabled = True
     g.legend.layout = 'horizontal'
