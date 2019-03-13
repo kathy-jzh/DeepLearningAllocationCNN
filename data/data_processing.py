@@ -7,12 +7,12 @@ from pyts.image import GADF, GASF, MTF
 from pykalman import KalmanFilter
 
 from utils import load_pickle, log, dump_pickle, remove_all_files_from_dir
-from config.hyperparams import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_START_DATE
+from config.hyperparams import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_START_DATE, PERMNOS_to_avoid
 
 
 class DataHandler:
     def __init__(self, encoding_method='GADF', window_len=64, image_size=16, retrain_freq=5,
-                 start_date: int = DEFAULT_START_DATE, targets_methods=['close'],
+                 start_date: int = DEFAULT_START_DATE, targets_methods=['close'],minimum_volume=1e6,
                  end_date: int = DEFAULT_END_DATE, frac_of_stocks=1., stock_data_dir_path: str = 'data/2019_stock_data',
                  dir_for_samples='data/cnn_samples/regular', nb_of_stocks_by_file=50, kwargs_target_methods=None
                  ):
@@ -26,6 +26,7 @@ class DataHandler:
         self._kwargs_target_methods = kwargs_target_methods or {}
 
         self._features = ['date','PRC','ASKHI','BIDLO','VOL']
+        self._min_volume = minimum_volume
 
         self._start_date = start_date
         self._end_date = end_date
@@ -58,10 +59,10 @@ class DataHandler:
         file_names = ['stockdata_{}'.format(i) for i in choices]
         df_data = self._load_stock_data(file_names, data_dir_path=self._stock_data_dir_path,
                                         logger_env=self._LOGGER_ENV)
+        self._df_raw_data = df_data
         df_data = self._extract_features(df_data)
-        df_data = self._get_data_from_stocks(df_data, ['10026'])  # todo
+        df_data = self._filter_data(df_data)
         df_data  = self.__rectify_prices(df_data)
-
         self._stocks_list = np.unique(df_data.index)
         self.log('Data finalized in attribute df_data, number of stocks {}'.format(len(self._stocks_list)))
         self.df_data = self._get_data_between_and_sort(df_data, self._start_date, self._end_date, self._LOGGER_ENV)
@@ -317,11 +318,18 @@ class DataHandler:
         return df_res
 
 
-    @staticmethod
-    def _get_data_from_stocks(df: pd.DataFrame, stocks_list: list):
-        # TODO
-        # raise NotImplementedError('Not yet implemented')
-        return df
+
+    def _filter_data(self,df_data):
+        df_filter = df_data.reset_index()[['PERMNO', 'VOL']]
+        df_filter = df_filter.groupby('PERMNO').mean().sort_values('VOL', ascending=False)
+        df_filter = df_filter[df_filter.VOL>=self._min_volume]
+        list_stocks = df_filter.index
+        list_stocks = [permno for permno in list_stocks if permno not in PERMNOS_to_avoid]
+        df_data = df_data.loc[list_stocks]
+
+        return df_data
+
+
 
     # TODO this function should build a df with the new features we want
     def _extract_features(self,df_data):
@@ -407,6 +415,20 @@ class DataHandler:
 
     @staticmethod
     def _extract_data_for_stocks(df_data_multi_ind: pd.DataFrame, list_stocks: list):
+        """
+        :param df_data_multi_ind:
+
+                * Example:
+                                            PRC	ASKHI	BIDLO	VOL
+                    PERMNO	date
+                    92279	20150102	18.4100	18.6400	18.3241	39626.0
+                            20150105	18.1300	18.2700	18.0800	153953.0
+                            20150106	18.0100	18.1700	17.8900	1356976.0
+
+
+        :param list_stocks: list of stocks to keep
+        :return:
+        """
         df_res = df_data_multi_ind.loc[list_stocks]
         df_res = df_res.reset_index(level=0, drop=False)
         return df_res
