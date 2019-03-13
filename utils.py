@@ -2,7 +2,37 @@ from ipyLogger import get_logger
 import sys
 import os
 import pickle
+import ezhc as hc
 
+
+def plot_highstock_with_table(df,title=''):
+    # Todo add more args
+    g = hc.Highstock()
+
+    g.chart.width = 1000
+    g.chart.height = 600
+    g.legend.enabled = True
+    g.legend.layout = 'horizontal'
+    g.legend.align = 'center'
+    g.legend.maxHeight = 100
+    g.tooltip.enabled = True
+    g.tooltip.valueDecimals = 2
+    g.exporting.enabled = True
+
+    g.chart.zoomType = 'xy'
+    g.title.text = title
+    g.subtitle.text = 'Subtitle ? '
+
+    g.plotOptions.series.compare = 'percent'
+
+    g.xAxis.gridLineWidth = 1.0
+    g.xAxis.gridLineDashStyle = 'Dot'
+    g.yAxis.gridLineWidth = 1.0
+    g.yAxis.gridLineDashStyle = 'Dot'
+
+    g.series = hc.build.series(df)
+
+    return g.plot_with_table_1(save=False, dated=True, version='latest')
 
 def log(msg, environment='', loglevel='info', **kwargs):
     """"""

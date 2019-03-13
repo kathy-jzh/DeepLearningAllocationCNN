@@ -4,7 +4,7 @@ import tensorflow as tf
 import os
 import ezhc as hc
 
-from utils import load_pickle, log
+from utils import load_pickle, log,plot_highstock_with_table
 from data.data_processing import DataHandler, get_training_data_from_path
 
 
@@ -30,11 +30,11 @@ class Backtester:
 
     def run_backtest(self):
         X = self.get_df_all_data()
-        print(X.shape)
         pred = self.run_predictions(X)
         self._make_df_for_bckt(pred)
 
         df_backt_results = self._run_strategy()
+
         df_strats = df_backt_results.astype(np.float64)
         df_strats.index.name='date'
         df_strats['Cash'] = 1.03**(5./252.)
@@ -162,40 +162,26 @@ class Backtester:
         graph = tf.get_default_graph()
         self.restore_output_op(sess)
         self.log('Model Restored, launching output operation')
-        pred = sess.run(self._output, feed_dict={self._x: X})
+
+        size_1_image = np.prod(X[0].shape)
+        limit_size = 20*16*16*4
+        size_batch = int(limit_size/size_1_image)+1
+        pred = np.zeros((0,3))
+        self.log('To avoid killing the kernel, we run predictions in {} batches'.format(round(len(X)/size_batch)))
+        for batch in range(0,len(X),size_batch):
+            X_batch = X[batch:batch+size_batch]
+            pred_batch = sess.run(self._output, feed_dict={self._x: X_batch})
+            pred = np.concatenate([pred,pred_batch])
+
         self.log('Predictions computed')
         sess.close()
         return pred
         # must run ouput and add the predictions in the dataframe df_all_data as 3 columns
 
-    def plot_backtest(self,cash_rate = 1.04**(5./252.)):
-        g = hc.Highstock()
+    def plot_backtest(self):
 
-        g.chart.width = 1000
-        g.chart.height = 600
-        g.legend.enabled = True
-        g.legend.layout = 'horizontal'
-        g.legend.align = 'center'
-        g.legend.maxHeight = 100
-        g.tooltip.enabled = True
-        g.tooltip.valueDecimals = 2
-        g.exporting.enabled = True
+        return plot_highstock_with_table(self.df_strats,title='Backtest for different strategies')
 
-        g.chart.zoomType = 'xy'
-        g.title.text = 'Backtest for different strategies'
-        g.subtitle.text = 'Subtitle ? '
-
-        g.plotOptions.series.compare = 'percent'
-
-        g.xAxis.gridLineWidth = 1.0
-        g.xAxis.gridLineDashStyle = 'Dot'
-        g.yAxis.gridLineWidth = 1.0
-        g.yAxis.gridLineDashStyle = 'Dot'
-
-
-        g.series = hc.build.series(self.df_strats)
-
-        return g.plot_with_table_1(save=False, dated=True, version='latest')
 
     def get_df_all_data(self):
         samples_path = self._path_data
