@@ -85,6 +85,7 @@ class Backtester:
                 df_results.loc[date][strat] = df_rets.loc[date][list_permnos_to_buy].mean()
         return df_results
 
+
     def __create_signals(self,df_data,strategies=['10_max_long','20_max_long']):
         """
         :param df_data: Example
