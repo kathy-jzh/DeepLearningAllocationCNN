@@ -2,10 +2,9 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 import os
-import ezhc as hc
+
 
 from utils import load_pickle, log,plot_highstock_with_table,integer_to_timestamp_date_index
-from data.data_processing import DataHandler, get_training_data_from_path
 
 
 # TODO see if we need to use a datahandler so that we will run the predictions
@@ -33,8 +32,9 @@ class Backtester:
         pred = self.run_predictions(X)
         self._make_df_for_bckt(pred)
 
-        df_backt_results = self._run_strategy()
+        df_backt_results = self._run_strategies()
 
+        df_backt_results = df_backt_results.shift(1) # because returns in reality do not happen just when we buy, but on next week
         df_strats = df_backt_results.astype(np.float64)
         df_strats = integer_to_timestamp_date_index(df_strats)
         # df_strats['Cash'] = 1.03**(5./252.)
@@ -52,15 +52,17 @@ class Backtester:
         self.df_strats = df_strats
 
 
-    def _run_strategy(self):
+
+
+    def _run_strategies(self):
         """ Uses the dataframe with all data: Example below, to make a backtest
-               PERMNO     PRC      long      hold     short
+               PERMNO     RET     long      hold     short
         date
-        20181030  83387.0    8.89  0.149458  0.353090  0.497452
-        20181030  84207.0  119.15  0.404111  0.385122  0.210767
-        20181030  83815.0   16.59  0.613428  0.268158  0.118414
-        20181030  83835.0   55.55  0.317590  0.389825  0.292584
-        20181030  83469.0   37.80  0.521703  0.326894  0.151403
+        20181030  83387.0   1.03  0.149458  0.353090  0.497452
+        20181030  84207.0   1.03  0.404111  0.385122  0.210767
+        20181030  83815.0   1.002  0.613428  0.268158  0.118414
+        20181030  83835.0   1.02  0.317590  0.389825  0.292584
+        20181030  83469.0   0.99  0.521703  0.326894  0.151403
         :return:
 
 
@@ -69,12 +71,16 @@ class Backtester:
         df_data = self._df_all_data
         strategies = ['10_max_long', '20_max_long','2_max_long']
         self._df_permnos_to_buy = self.__create_signals(df_data,strategies=strategies)
-        self._df_permnos_to_buy = self._df_permnos_to_buy.shift(1).dropna()
+        # self._df_permnos_to_buy = self._df_permnos_to_buy.shift(1).dropna() # because if we buy at i we get returns in i+1, not here
+        # In the data returns at date i are the returns we would get if we buy at i
 
-        # Compute Returns
-        df_prices = df_data[['PRC', 'PERMNO']].pivot_table(columns='PERMNO', index='date')
-        df_rets = df_prices / df_prices.shift(1)
-        df_rets = df_rets.dropna().PRC
+        # Compute/Get Returns
+        # df_prices = df_data[['PRC', 'PERMNO']].pivot_table(columns='PERMNO', index='date')
+        # df_rets = df_prices / df_prices.shift(1)
+        # df_rets = df_rets.dropna().PRC
+        df_rets = df_data[['RET', 'PERMNO']].pivot_table(columns='PERMNO', index='date')
+        df_rets = df_rets.dropna().RET
+
 
         # Run the backtest with the returns and the predictions
         self.log('Running Backtest')
@@ -216,7 +222,7 @@ class Backtester:
                                axis=0)  # need this to get an array
             # Y = np.concatenate([[sample for sample in df_all_data_one_batch[targets_type].values]], axis=0)
             # n_samples = Y.shape[0]
-            df_all_data_one_batch_for_bckt = df_all_data_one_batch[['PERMNO', 'PRC']]
+            df_all_data_one_batch_for_bckt = df_all_data_one_batch[['PERMNO', 'RET']]
             if i == 0:
                 X_res = X
                 df_all_data = df_all_data_one_batch_for_bckt

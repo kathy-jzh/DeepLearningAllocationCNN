@@ -12,9 +12,11 @@ from config.hyperparams import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_ST
 
 class DataHandler:
     def __init__(self, encoding_method='GADF', window_len=64, image_size=16, retrain_freq=5,
-                 start_date: int = DEFAULT_START_DATE, targets_methods=['close'],minimum_volume=1e6,
-                 end_date: int = DEFAULT_END_DATE, frac_of_stocks=1., stock_data_dir_path: str = 'data/2019_stock_data',
-                 dir_for_samples='data/cnn_samples/regular', nb_of_stocks_by_file=50, kwargs_target_methods=None
+                 start_date: int = DEFAULT_START_DATE, targets_methods=['close'], minimum_volume=1e6,
+                 end_date: int = DEFAULT_END_DATE, frac_of_stocks=1.,
+                 stock_data_dir_path: str = 'data/2019_2010_stock_data',
+                 dir_for_samples='data/cnn_samples/regular', nb_of_stocks_by_file=50, nb_files_to_read: int = 34,
+                 kwargs_target_methods=None
                  ):
 
         self._window_len = window_len
@@ -25,7 +27,7 @@ class DataHandler:
         # self._features = ['']
         self._kwargs_target_methods = kwargs_target_methods or {}
 
-        self._features = ['date','PRC','ASKHI','BIDLO','VOL']
+        self._features = ['date', 'RET', 'ASKHI', 'BIDLO', 'VOL', 'sprtrn']
         self._min_volume = minimum_volume
 
         self._start_date = start_date
@@ -36,10 +38,11 @@ class DataHandler:
         self._directory_for_samples = dir_for_samples
         self._stock_data_dir_path = stock_data_dir_path
 
-        self._N_FILES_CRSP = 17
+        self._N_FILES_CRSP = nb_files_to_read
         self._LOGGER_ENV = 'image_encoding'
 
         self.df_data = None
+        self._df_raw_data = None
         self._stocks_list = None
 
     def get_df_data(self):
@@ -60,9 +63,10 @@ class DataHandler:
         df_data = self._load_stock_data(file_names, data_dir_path=self._stock_data_dir_path,
                                         logger_env=self._LOGGER_ENV)
         self._df_raw_data = df_data
-        df_data = self._extract_features(df_data)
         df_data = self._filter_data(df_data)
-        df_data  = self.__rectify_prices(df_data)
+        df_data = self.__rectify_prices(df_data)
+
+        df_data = self._extract_features(df_data)
         self._stocks_list = np.unique(df_data.index)
         self.log('Data finalized in attribute df_data, number of stocks {}'.format(len(self._stocks_list)))
         self.df_data = self._get_data_between_and_sort(df_data, self._start_date, self._end_date, self._LOGGER_ENV)
@@ -101,9 +105,8 @@ class DataHandler:
             df_res = self._build_images_one_batch(df_batch_data, batch_name, use_smoothed_data=use_smoothed_data)
             # SORT BY DATES
             df_res = df_res.set_index('date').sort_index()
-            self.test = df_res
             # Dumping the pickle dataframe
-            dump_pickle(df_res, os.path.join(self._directory_for_samples, batch_name),     logger_env=self._LOGGER_ENV)
+            dump_pickle(df_res, os.path.join(self._directory_for_samples, batch_name), logger_env=self._LOGGER_ENV)
 
         # self.__delete_df_data_from_memory()
 
@@ -126,70 +129,56 @@ class DataHandler:
         plt.imshow(image_data, cmap='rainbow', origin='lower')
         plt.title(self._encoding_method, fontsize=16)
 
-    # SHOULD NOT BE USED ANYMORE
-    def _get_targets_one_batch(self, df_batch_data: pd.DataFrame, batch_name: str):
-        pass
-        # dict_targets = {}
-        # log('***** Building Targets for batch {}, methods will be {}'.format(batch_name, self._targets_methods),
-        #    )
-        # assert len(self._targets_methods) >= 1, 'The number of methods specified must be >=1'
-        #
-        # for method in self._targets_methods:
-        #     log('Target building method {}'.format(method),)
-        #     if method == 'VWAP':
-        #         # TODO put the up and down returns as params
-        #         labels_array, df_for_backtest = self._build_VWAP_returns(df_batch_data, self._window_len,
-        #                                                                  self._retrain_freq,
-        #                                                                  **self._kwargs_target_methods)
-        #         dict_targets.update({'VWAP_targets': labels_array, 'df_for_backtest': df_for_backtest})
-        #     elif method == 'close':
-        #         labels_array, df_for_backtest = self._build_close_returns(df_batch_data, self._window_len,
-        #                                                                   self._retrain_freq,
-        #                                                                   **self._kwargs_target_methods)
-        #         dict_targets.update({'close_targets': labels_array, 'df_for_backtest': df_for_backtest})
-        #
-        #     else:
-        #         raise BaseException('So far the targets can only be computed by close prices or VWAP')
-        # log('Targets for batch {} are built'.format(batch_name),)
-        # return dict_targets
-
     @staticmethod
     def _build_close_returns(df, window_len=64, retrain_freq=5, up_return=0.0125, down_return=-0.0125,
                              buy_on_last_date=True):
-        data = df[['PRC']]
+        # data = df[['PRC']]
+        data = df
         n_sample = len(data)
-        targets = []
+        targets, prc_list, dates_list = [], [], []
 
         _long = [1, 0, 0]
         _hold = [0, 1, 0]
         _short = [0, 0, 1]
         rebalance_indexes = []
+        df_rolling_ret = np.exp(np.log(data.RET).rolling(window=retrain_freq).sum())  # product of returns
+        df_rolling_std = data.RET.rolling(window=window_len).std() * np.sqrt(252.)
+
         for i in range(window_len, n_sample, retrain_freq):
             j = i - 1 if buy_on_last_date else i
 
-            lastprice_ = data.PRC.iloc[j]
-            nextprice_ = data.PRC.iloc[np.min([n_sample - 1, i - 1 + retrain_freq])]
+            # lastprice_ = data.PRC.iloc[j]
+            # nextprice_ = data.PRC.iloc[np.min([n_sample - 1, i - 1 + retrain_freq])]
+            #
+            # price_return = (nextprice_ - lastprice_) / lastprice_
+            # print(df_rolling_ret.shape)
+            # print(i-1-retrain_freq)
+            price_return = df_rolling_ret.iloc[np.min([n_sample - 1, i - 1 + retrain_freq])]
+            dates_list.append(data.index[j])
+            prc_list.append(price_return)
 
-            price_return = (nextprice_ - lastprice_) / lastprice_
+            vol = df_rolling_std.iloc[j]
 
-            if price_return > up_return:
+            if price_return - 1. > up_return * vol * 4:
                 targets.append(_long)
-            elif price_return < down_return:
+            elif price_return - 1. < down_return * vol * 4:
                 targets.append(_short)
             else:
                 targets.append(_hold)
 
             # we keep the indexes of the dates when there will be a rebalance in the portfolio
             rebalance_indexes.append(j)
-        df_for_backtest = df.iloc[rebalance_indexes]
+        df_for_backtest = df_rolling_ret.iloc[rebalance_indexes]
 
-        return np.asarray(targets), df_for_backtest
+        return np.asarray(targets), df_for_backtest, prc_list, dates_list
 
-    def __rectify_prices(self,df_data):
-        self.log('Rectifying {} negative prices out of {} prices'.format(len(df_data[df_data.PRC<=0]),len(df_data.PRC)))
+    def __rectify_prices(self, df_data):
+        self.log(
+            'Rectifying {} negative prices out of {} prices'.format(len(df_data[df_data.PRC <= 0]), len(df_data.PRC)))
         df_data.PRC = np.abs(df_data.PRC)
         return df_data
 
+    # todo do not use
     @staticmethod
     def _build_VWAP_returns(df, window_len=64, retrain_freq=5, up_return=0.0125, down_return=-0.0125):
         data = df[['PRC', 'VOL']]
@@ -238,11 +227,11 @@ class DataHandler:
         samples_list, dates_list, prc_list = [], [], []
         for i in range(window_len, n_days, retrain_freq):
             window_data = df_one_permno.T.iloc[:, i - window_len:i]
-            date = df_one_permno.index[i-1]
-            dates_list.append(date)
-            prc_list.append(df_one_permno.loc[date, 'PRC'])
+            # date = df_one_permno.index[i - 1]
+            # dates_list.append(date)
+            # prc_list.append(df_one_permno.loc[date, 'PRC'])
 
-            # todo understand how this works
+            # todo we probably should use this on prices not on returns
             if use_smoothed_data:
                 Smoother = KalmanFilter(n_dim_obs=window_data.shape[0], n_dim_state=window_data.shape[0],
                                         em_vars=['transition_matrices', 'observation_matrices',
@@ -267,37 +256,39 @@ class DataHandler:
             else:
                 raise BaseException('Method must be either GADF, GASF or MTF not {}'.format(encoding_method))
         samples_list = np.asarray(samples_list)
-        dates_list = np.asarray(dates_list)
-        prc_list = np.asarray(prc_list)
-        return samples_list, dates_list, prc_list
+        # dates_list = np.asarray(dates_list)
+        # prc_list = np.asarray(prc_list)
+        return samples_list  # , dates_list, prc_list
 
     def _build_images_one_batch(self, df_batch_data, batch_name, use_smoothed_data=False):
-        self.log('Building Targets and Images for batch {}'.format(batch_name),)
-        self.log('Targets will be constructed with methods: {}'.format(self._targets_methods),)
+        self.log('Building Targets and Images for batch {}'.format(batch_name), )
+        self.log('Targets will be constructed with methods: {}'.format(self._targets_methods), )
 
         df_batch_data = df_batch_data.reset_index(drop=False).set_index(['PERMNO', 'date'])
         all_permnos = df_batch_data.index.levels[0]
         # The empty dataframe initialized
-        columns_df_res = ['sample', 'date', 'PRC'] + self._targets_methods
+        columns_df_res = ['sample', 'date', 'RET'] + self._targets_methods
         df_res = pd.DataFrame(columns=columns_df_res)
 
         for permno in all_permnos:
             df_one_permno = df_batch_data.loc[permno]
-            samples_list, dates_list, prc_list = self._build_images_one_stock(df_one_permno, self._window_len,
+            samples_list = self._build_images_one_stock(df_one_permno, self._window_len,
                                                                               self._retrain_freq, self._encoding_method,
-                                                                              self._image_size, use_smoothed_data=use_smoothed_data)
+                                                                              self._image_size,
+                                                                              use_smoothed_data=use_smoothed_data)
 
             for method in self._targets_methods:
                 targets_list = []
-                if method == 'VWAP':
-                    labels_array, df_for_backtest = self._build_VWAP_returns(df_one_permno, self._window_len,
-                                                                             self._retrain_freq,
-                                                                             **self._kwargs_target_methods)
+                # if method == 'VWAP':
+                #     labels_array, df_for_backtest = self._build_VWAP_returns(df_one_permno, self._window_len,
+                #                                                              self._retrain_freq,
+                #                                                              **self._kwargs_target_methods)
 
-                elif method == 'close':
-                    labels_array, df_for_backtest = self._build_close_returns(df_one_permno, self._window_len,
-                                                                              self._retrain_freq,
-                                                                              **self._kwargs_target_methods)
+                if method == 'close':
+                    labels_array, df_for_backtest, prc_list, dates_list = self._build_close_returns(df_one_permno,
+                                                                                                    self._window_len,
+                                                                                                    self._retrain_freq,
+                                                                                                    **self._kwargs_target_methods)
 
                 else:
                     raise BaseException('So far the targets can only be computed by close prices or VWAP')
@@ -313,40 +304,47 @@ class DataHandler:
             df_res_one_permno['PERMNO'] = permno
             df_res = pd.concat([df_res, df_res_one_permno])
 
-        self.log('Targets and Images for batch {} are built'.format(batch_name),)
+        self.log('Targets and Images for batch {} are built'.format(batch_name), )
 
         return df_res
 
-
-
-    def _filter_data(self,df_data):
+    def _filter_data(self, df_data):
         df_filter = df_data.reset_index()[['PERMNO', 'VOL']]
         df_filter = df_filter.groupby('PERMNO').mean().sort_values('VOL', ascending=False)
-        df_filter = df_filter[df_filter.VOL>=self._min_volume]
+        df_filter = df_filter[df_filter.VOL >= self._min_volume]
         list_stocks = df_filter.index
-        list_stocks = [permno for permno in list_stocks if permno not in PERMNOS_to_avoid]
+        # list_stocks = [permno for permno in list_stocks if permno not in PERMNOS_to_avoid] # todo
         df_data = df_data.loc[list_stocks]
 
         return df_data
 
-
-
     # TODO this function should build a df with the new features we want
-    def _extract_features(self,df_data):
-        #TODO shoudl call at least _get_high_low_feature and the functions that gets returns
+    def _extract_features(self, df_data: pd.DataFrame):
+        """
+        Computes the features we want and keep only what is necessary for the network
+        :param df_data: Example:
+                        date	TICKER	COMNAM	            BIDLO	ASKHI	        PRC	        VOL	        RET 	SHROUT	    sprtrn
+            PERMNO
+            36468	20100104	SHW	SHERWIN WILLIAMS CO	61.17000	62.14000	61.67000	1337900.0	0.000324	113341.0	0.016043
+            36468	20100105	SHW	SHERWIN WILLIAMS CO	59.55000	61.86000	60.21000	3081500.0	-0.023674	113341.0	0.003116
+        :return:
+        """
+        df_data = self._get_high_low_feature(df_data)  # apply (PRC - BIDLO)/PRC and (ASKHI - PRC) / PRC
+        df_data.VOL = df_data.VOL / df_data.SHROUT  # to compensate for stock splits
+        df_data.RET = df_data.RET + 1.  # to compensate for stock splits
+
         columns_to_get = self._features
         return df_data[columns_to_get]
 
-
-
-    # TODO this function should take a df with BIDLO and ASKHI and return a df with
-    # todo : (PRC - BIDLO)/PRC and (ASKHI - PRC) / PRC
     @staticmethod
-    def _get_high_low_feature():
-        pass
+    def _get_high_low_feature(df_data):
+        df_data.BIDLO = (df_data.BIDLO - df_data.PRC) / df_data.PRC
+        df_data.ASKHI = (df_data.ASKHI - df_data.PRC) / df_data.PRC
+        return df_data
 
     def __delete_df_data_from_memory(self):
         self.df_data = None
+        self._df_raw_data = None
 
     @staticmethod
     def _get_data_between_and_sort(df: pd.DataFrame, start_date: int = DEFAULT_START_DATE,
@@ -410,8 +408,8 @@ class DataHandler:
         df_res = df_res.set_index('PERMNO')
         return df_res
 
-    def log(self,msg):
-        log(msg,environment=self._LOGGER_ENV)
+    def log(self, msg):
+        log(msg, environment=self._LOGGER_ENV)
 
     @staticmethod
     def _extract_data_for_stocks(df_data_multi_ind: pd.DataFrame, list_stocks: list):
@@ -465,7 +463,7 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
     for i, file_name in enumerate(list_file_names):
         path = os.path.join(samples_path, file_name)
         df_all_data = load_pickle(path, logger_env=logger_env)
-        df_all_data = df_all_data.sort_index() # In case it is not sorted
+        df_all_data = df_all_data.sort_index()  # In case it is not sorted
 
         log('first_date: {}, last_date: {}'.format(df_all_data.index[0], df_all_data.index[-1]),
             environment=logger_env)
@@ -497,7 +495,8 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
             Y_test = np.concatenate([Y_test, Y[stop_2:]])
         # if predict:
 
-    log('Nb of Samples in training:{}, validation: {}, test:{}'.format( len(Y_train), len(Y_val), len(Y_test)), environment=logger_env)
+    log('Nb of Samples in training:{}, validation: {}, test:{}'.format(len(Y_train), len(Y_val), len(Y_test)),
+        environment=logger_env)
     # Distributions of Labels
     train_d = np.sum(Y_train, axis=0) / len(Y_train)
     val_d = np.sum(Y_val, axis=0) / len(Y_val)

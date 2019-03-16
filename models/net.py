@@ -68,6 +68,40 @@ class Net:
             return outputs
 
     @staticmethod
+    def conv_batch_normalization(x, n_out, phase_train, decay=0.99):
+        """
+        input:
+            x: input data to be batch normalized
+            n_out: the size of the output tensor
+            phase_train: a boolean tensor. True: update mean and var. False: not update
+        """
+        # offset: An offset Tensor, often denoted beta in equations, or None. If present, will be added to the normalized tensor.
+        # scale: A scale Tensor, often denoted gamma in equations, or None. If present, the scale is applied to the normalized tensor.
+        beta_init = tf.constant_initializer(value=0.0, dtype=tf.float32)
+        gamma_init = tf.constant_initializer(value=1.0, dtype=tf.float32)
+
+        beta = tf.get_variable("beta", [n_out], initializer=beta_init)
+        gamma = tf.get_variable("gamma", [n_out], initializer=gamma_init)
+
+        [batch_mean, batch_var] = tf.nn.moments(x, [0, 1, 2], name='moments')
+        # use an exponential moving average to estimate the population mean and variance during training
+        # set decay rate to be larger if you have larger size of data
+        ema = tf.train.ExponentialMovingAverage(decay=decay)
+        ema_apply_op = ema.apply([batch_mean, batch_var])
+        [ema_mean, ema_var] = ema.average(batch_mean), ema.average(batch_var)
+
+        def mean_var_with_update():
+            # in training episode, train_mean and train_var have to be updated first by tf.control_dependencies, then execute the return line
+            # https://www.tensorflow.org/api_docs/python/tf/Graph#control_dependencies
+            with tf.control_dependencies([ema_apply_op]):
+                return tf.identity(batch_mean), tf.identity(batch_var)
+
+        [mean, var] = tf.cond(phase_train, mean_var_with_update, lambda: (ema_mean, ema_var))
+        normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 0.001)
+
+        return normed
+
+    @staticmethod
     def add_bias(inputs):
         """
         A lambda function to return proper size of bias added to conv layer
