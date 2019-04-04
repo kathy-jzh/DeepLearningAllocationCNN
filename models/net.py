@@ -19,6 +19,9 @@ class Net:
 
         self.x = None
         self.y = None
+        self.phase_train = None
+        self.dropout = None
+
         self.init = None
         self.output = None
         self.global_step = None
@@ -66,15 +69,25 @@ class Net:
             outputs = tf.matmul(inputs, w)
             outputs = tf.nn.bias_add(outputs, b)
             return outputs
+    @staticmethod
+    def batch_normalization(inputs, training):
+        """Performs a batch normalization using a standard set of parameters."""
+        # We set fused=True for a significant performance boost. See
+        # https://www.tensorflow.org/performance/performance_guide#common_fused_ops
+        return tf.compat.v1.layers.batch_normalization(
+            inputs=inputs, axis=-1,
+            momentum=0.99, epsilon=1e-5, center=True,
+            scale=True, training=training, fused=True)
 
     @staticmethod
-    def conv_batch_normalization(x, n_out, phase_train, decay=0.99):
+    def batch_normalization_v0(x, phase_train, decay=0.99):
         """
         input:
             x: input data to be batch normalized
             n_out: the size of the output tensor
             phase_train: a boolean tensor. True: update mean and var. False: not update
         """
+        n_out = x.get_shape()[-1]
         # offset: An offset Tensor, often denoted beta in equations, or None. If present, will be added to the normalized tensor.
         # scale: A scale Tensor, often denoted gamma in equations, or None. If present, the scale is applied to the normalized tensor.
         beta_init = tf.constant_initializer(value=0.0, dtype=tf.float32)
@@ -101,14 +114,6 @@ class Net:
 
         return normed
 
-    @staticmethod
-    def add_bias(inputs):
-        """
-        A lambda function to return proper size of bias added to conv layer
-        :param inputs:
-        :return:
-        """
-        return tf.nn.bias_add(inputs, tf.Variable(tf.constant(0.0, shape=[tf.Tensor.get_shape(inputs).as_list()[-1]])))
 
     @staticmethod
     def inception_mod(inputs, hyperparams: dict, name: str):
@@ -263,8 +268,10 @@ class Net:
             tf_optimizer = tf.train.AdamOptimizer
         elif tf_optimizer.lower() == 'sgd':
             tf_optimizer = tf.train.GradientDescentOptimizer
+        elif tf_optimizer.lower()=='rmsprop':
+            tf_optimizer = tf.train.RMSPropOptimizer
         else:
-            raise NotImplementedError('You need to modify the code to use another optimizer so far we have sgd and adam')
+            raise NotImplementedError('You need to modify the code to use another optimizer so far we have sgd, rmsprop and adam')
 
         tf.summary.scalar('training_loss', self.loss)
         self.optimizer = tf_optimizer(learning_rate=learning_rate).minimize(self.loss, global_step=self.global_step,name='minimize')
@@ -301,6 +308,9 @@ class Net:
         self.x = tf.placeholder(tf.float32, self._shape_x, name='x')
         # tf.add_to_collection('x',self.x)
         self.y = tf.placeholder(tf.float32, self._shape_y, name='y')
+        self.phase_train = tf.placeholder(tf.bool,name='phase_train')
+        self.dropout = tf.placeholder(tf.float32,name='dropout')
+
         self._inference(**kwargs)  # example: dropout
         self._xentropy_loss_func(**kwargs)  # example: expected_penalty
 
@@ -316,3 +326,10 @@ class Net:
 
 
 
+    def get_dropout(self):
+        try:
+            dropout = self._hyperparams['dropout']
+        except KeyError as e:
+            print('dropout not found in kwargs, dropout 0.15 will be used')
+            dropout = 0.15
+        return dropout

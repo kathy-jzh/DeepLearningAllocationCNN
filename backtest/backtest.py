@@ -34,7 +34,7 @@ class Backtester:
 
         df_backt_results = self._run_strategies()
 
-        df_backt_results = df_backt_results.shift(1) # because returns in reality do not happen just when we buy, but on next week
+        df_backt_results = df_backt_results.shift(1).dropna() # because returns in reality do not happen just when we buy, but on next week
         df_strats = df_backt_results.astype(np.float64)
         df_strats = integer_to_timestamp_date_index(df_strats)
         # df_strats['Cash'] = 1.03**(5./252.)

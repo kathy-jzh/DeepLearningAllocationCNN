@@ -11,10 +11,10 @@ DEFAULT_END_DATE = 20200102
 # Weight parameters as devised in the original research paper
 AlexNet_hyperparams = {
     # 1st Conv Layer block
-    "conv1_conv_kernel": (2, 2, 4, 6),
+    "conv1_conv_kernel": (7, 7, 5, 10),
     
     # 2nd Conv Layer block
-    "conv2_conv_kernel": (2, 2, 6, 10),
+    "conv2_conv_kernel": (3, 3, 10, 10),
     # 3rd Conv Layer block
     "conv3_conv_kernel": (2, 2, 10, 8),
     
