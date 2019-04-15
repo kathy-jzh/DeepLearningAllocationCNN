@@ -120,7 +120,7 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
         size_1_image = np.prod(valX[0].shape)
         limit_size = batch_size * 42 * 42 * 5
         size_batch = int(limit_size / size_1_image) + 1
-        output_val,epoch_val_loss,epoch_val_acc= np.zeros((0, 3)), 0., 0.
+        output_val,epoch_val_loss= np.zeros((0, 3)), 0.
         nb_batches = round(len(X) / size_batch)
         log('To avoid killing the kernel, we run predictions in {} batches'.format(nb_batches), environment=DEFAULT_LOG_ENV)
         for batch in range(0, len(X), size_batch):
@@ -128,26 +128,25 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
             if X_batch.shape[0]==0:
                 break
             # print(X_batch.shape)
-            pred_batch, epoch_val_loss_batch, epoch_val_acc_batch = sess.run([net.output, net.loss, net.accuracy],
+            pred_batch, epoch_val_loss_batch = sess.run([net.output, net.loss],
                                                              feed_dict={net.x: X_batch, net.y: Y_batch,net.phase_train:False,net.dropout:0.})
             output_val = np.concatenate([output_val, pred_batch])
             epoch_val_loss+=epoch_val_loss_batch
-            epoch_val_acc+=epoch_val_acc_batch
         epoch_val_loss/=nb_batches
-        epoch_val_acc/=nb_batches
 
         # output_val, epoch_val_loss, epoch_val_acc = sess.run([net.output, net.loss, net.accuracy],
         #                                                      feed_dict={net.x: valX, net.y: valY,net.phase_train:False,net.dropout:0.})
-        rows_conf_matrix = ['{}\n'.format(row_i) for row_i in get_confusion_matrix(valY, output_val)]
+        conf_matrix = get_confusion_matrix(valY, output_val)
+        rows_conf_matrix = ['{}\n'.format(row_i) for row_i in conf_matrix]
         log('Confusion Matrix : \n ' + ''.join(rows_conf_matrix), environment=DEFAULT_LOG_ENV)
         pred.append(output_val)
         val_loss.append(epoch_val_loss)
+        epoch_val_acc = np.trace(conf_matrix)/np.sum(conf_matrix)
 
         # Displaying training info for the epoch
         if (e + 1) % display_step == 0:
             text_to_print = "Training time: {}  ======== Loss: {:.4f} Accuracy: {:.4f} val_Loss: {:.4f} val_acc: {:.4f} ".format(
-                round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_loss,
-                epoch_val_acc)
+                round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_loss,epoch_val_acc)
             log(text_to_print, DEFAULT_LOG_ENV)
 
         # Saving the model
