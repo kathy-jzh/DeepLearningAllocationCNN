@@ -63,7 +63,6 @@ def train_predict(X, Y, valX, valY,
         graph = tf.get_default_graph()
         # with tf.variable_scope(net.name, reuse=True):
         net.restore_importants_ops(sess, model_ckpt_path_to_restore)
-        # todo sess.close ???
         return _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_training,batch_size,display_step,save_step,model_ckpt_path,is_bayesian)
 
     else:
@@ -102,10 +101,8 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
         cc, aa = 0, 0
         for b in range(nb_of_batches_training):
             x_b, y_b = UtilsTraining._extract_minibatch(X, Y, batch_size=batch_size, current_batch=b)
-            sess.run([net.optimizer, net.global_step], feed_dict={net.x: x_b, net.y: y_b,net.phase_train:True,net.dropout:dropout})
-
+            _,__,c, a = sess.run([net.optimizer, net.global_step,net.loss, net.accuracy], feed_dict={net.x: x_b, net.y: y_b,net.phase_train:True,net.dropout:dropout})
             # Make evaluation on a batch basis
-            c, a = sess.run([net.loss, net.accuracy], feed_dict={net.x: x_b, net.y: y_b,net.phase_train:True,net.dropout:dropout})
             cc += (c * len(y_b))  # len(y_b) since the last batch can be of size smaller than batch size
             aa += (a * len(y_b))
             if (b + 1) % max(int(0.1 * nb_of_batches_training), 1) == 0:
@@ -113,6 +110,8 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
                     ': {:.4f} CumAccuracy: {:.4f}'.format(b + 1, nb_of_batches_training,
                                                           cc / (batch_size * (b + 1)),
                                                           aa / (batch_size * (b + 1))), DEFAULT_LOG_ENV)
+
+
         epoch_loss, epoch_acc = cc / float(sample_size), aa / float(sample_size)
         training_loss.append(epoch_loss)
 

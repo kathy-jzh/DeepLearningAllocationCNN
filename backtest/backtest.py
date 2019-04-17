@@ -164,6 +164,8 @@ class Backtester:
 
         self._output = graph.get_tensor_by_name('{}/output:0'.format(self._name_network))
         self._x = graph.get_tensor_by_name('{}/x:0'.format(self._name_network))
+        self._phase_train = graph.get_tensor_by_name('{}/phase_train:0'.format(self._name_network))
+        self._dropout = graph.get_tensor_by_name('{}/dropout:0'.format(self._name_network))
 
     def run_predictions(self, X):
         """
@@ -184,7 +186,7 @@ class Backtester:
         self.log('To avoid killing the kernel, we run predictions in {} batches'.format(round(len(X)/size_batch)))
         for batch in range(0,len(X),size_batch):
             X_batch = X[batch:batch+size_batch]
-            pred_batch = sess.run(self._output, feed_dict={self._x: X_batch})
+            pred_batch = sess.run(self._output, feed_dict={self._x: X_batch,self._phase_train:False,self._dropout:0.})
             pred = np.concatenate([pred,pred_batch])
 
         self.log('Predictions computed')
