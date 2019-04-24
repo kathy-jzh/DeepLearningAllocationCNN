@@ -88,7 +88,10 @@ class Backtester:
         for date in self._df_permnos_to_buy.index:
             for strat in strategies:
                 list_permnos_to_buy = self._df_permnos_to_buy.loc[date][strat]
-                df_results.loc[date][strat] = df_rets.loc[date][list_permnos_to_buy].mean()
+                if len(list_permnos_to_buy) ==0:
+                    df_results.loc[date][strat] = 1. # we buy nothing
+                else:
+                    df_results.loc[date][strat] = df_rets.loc[date][list_permnos_to_buy].mean()
         return df_results
 
 
@@ -110,18 +113,20 @@ class Backtester:
 
         df_permnos_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
         for date in df_data.index:
+            data_sorted = df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
+                by='long', ascending=False)
             for strat in strategies:
-                data_sorted = df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
-                            by='long', ascending=False)
                 if strat=='10_max_long':
-                    list_permons_to_buy = list(data_sorted.index[:10])
-                    df_permnos_to_buy.loc[date][strat] = list_permons_to_buy
+                    list_permnos_to_buy = list(data_sorted.index[:10])
+                    df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy
                 elif strat=='20_max_long':
-                    list_permons_to_buy = list(data_sorted.index[:20])
-                    df_permnos_to_buy.loc[date][strat] = list_permons_to_buy
+                    list_permnos_to_buy = list(data_sorted.index[:20])
+                    df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy
                 elif strat=='2_max_long':
-                    list_permons_to_buy = list(data_sorted.index[:2])
-                    df_permnos_to_buy.loc[date][strat] = list_permons_to_buy
+                    list_permnos_to_buy = list(data_sorted.index[:2])
+                    df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy
+                elif strat=='threshold':
+                    df_permnos_to_buy.loc[date][strat] = list(data_sorted[data_sorted.long >= 0.85].index)
                 else:
                     raise NotImplementedError('The strategy {} is not implemented'.format(strat))
         self.log('Signals created')
@@ -180,7 +185,7 @@ class Backtester:
         self.log('Model Restored, launching output operation')
 
         size_1_image = np.prod(X[0].shape)
-        limit_size = 20*16*16*4
+        limit_size = 20*42*42*4
         size_batch = int(limit_size/size_1_image)+1
         pred = np.zeros((0,3))
         self.log('To avoid killing the kernel, we run predictions in {} batches'.format(round(len(X)/size_batch)))
