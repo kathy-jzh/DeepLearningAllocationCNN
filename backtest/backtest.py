@@ -15,6 +15,8 @@ class Backtester:
         self._name_network = 'CondensedGoogLeNet'
         self._path_data = path_data
 
+        self._strategies = ['10_max_long', '20_max_long','2_max_long','threshold']
+
         self._start_date = start_date
         self._end_date = end_date
         # we need to restore the output op and just to use this one to get the pred
@@ -69,7 +71,7 @@ class Backtester:
         """
         # TODO modify the function to support different strategies, make a column weights in df_permnos_to_buy
         df_data = self._df_all_data
-        strategies = ['10_max_long', '20_max_long','2_max_long']
+        strategies = self._strategies
         self._df_permnos_to_buy = self.__create_signals(df_data,strategies=strategies)
         # self._df_permnos_to_buy = self._df_permnos_to_buy.shift(1).dropna() # because if we buy at i we get returns in i+1, not here
         # In the data returns at date i are the returns we would get if we buy at i
@@ -127,6 +129,8 @@ class Backtester:
                     df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy
                 elif strat=='threshold':
                     df_permnos_to_buy.loc[date][strat] = list(data_sorted[data_sorted.long >= 0.85].index)
+                elif strat='long_minus_short':
+
                 else:
                     raise NotImplementedError('The strategy {} is not implemented'.format(strat))
         self.log('Signals created')
@@ -139,10 +143,10 @@ class Backtester:
         chronologically
                 * Example:
 
-                PERMNO     PRC      long      hold     short
+                PERMNO     RET      long      hold     short
         date
-        20181030  83387.0    8.89  0.149458  0.353090  0.497452
-        20181030  84207.0  119.15  0.404111  0.385122  0.210767
+        20181030  83387.0    1.023  0.149458  0.353090  0.497452
+        20181030  84207.0  1.02  0.404111  0.385122  0.210767
         20181030  83815.0   16.59  0.613428  0.268158  0.118414
         20181030  83835.0   55.55  0.317590  0.389825  0.292584
         20181030  83469.0   37.80  0.521703  0.326894  0.151403
@@ -155,7 +159,7 @@ class Backtester:
         self._df_all_data = pd.concat([self._df_all_data, df_signals], axis=1)
         self._df_all_data = self._df_all_data.sort_index()
 
-    def restore_output_op(self, sess):
+    def restore_output_op(self, sess,latest=False):
         """
         Restores tensors : x and output and instanciates self._x and self._output
         :param sess: tf.Session
@@ -163,7 +167,11 @@ class Backtester:
         """
         saver = tf.train.import_meta_graph(self._path_model_to_restore)
         folder = os.path.dirname(self._path_model_to_restore)
-        saver.restore(sess, tf.train.latest_checkpoint(folder))
+        if latest:
+            file_to_restore =  tf.train.latest_checkpoint(folder)
+        else:
+            file_to_restore = self._path_model_to_restore.replace('.meta','')
+        saver.restore(sess,file_to_restore)
 
         graph = tf.get_default_graph()
 
