@@ -7,7 +7,6 @@ import pandas as pd
 
 
 def plot_highstock_with_table(df, title=''):
-    # Todo add more args
     g = hc.Highstock()
 
     g.chart.width = 900
@@ -34,6 +33,7 @@ def plot_highstock_with_table(df, title=''):
     g.series = hc.build.series(df)
 
     return g.plot_with_table_1(save=False, dated=True, version='latest')
+
 
 
 def integer_to_timestamp_date_index(df):

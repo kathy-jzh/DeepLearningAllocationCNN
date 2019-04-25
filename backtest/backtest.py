@@ -6,8 +6,6 @@ import os
 from utils import load_pickle, log, plot_highstock_with_table, integer_to_timestamp_date_index
 
 
-# TODO see if we need to use a datahandler so that we will run the predictions
-
 class Backtester:
     """
     Backtester object that:
@@ -75,10 +73,10 @@ class Backtester:
         date
         20181030  83387.0   1.03  0.149458  0.353090  0.497452
         20181030  84207.0   1.03  0.404111  0.385122  0.210767
-        20181030  83815.0   1.002  0.613428  0.268158  0.118414
 
-        :return:
-
+        :return:                  1_decile_long 2_decile_long
+                    20151001        0.92554       0.933354
+                    20151008        1.00058        0.99515
 
         """
         # TODO modify the function to support different strategies, make a column weights in df_permnos_to_buy
@@ -88,10 +86,7 @@ class Backtester:
         # self._df_permnos_to_buy = self._df_permnos_to_buy.shift(1).dropna() # because if we buy at i we get returns in i+1, not here
         # In the data returns at date i are the returns we would get if we buy at i
 
-        # Compute/Get Returns
-        # df_prices = df_data[['PRC', 'PERMNO']].pivot_table(columns='PERMNO', index='date')
-        # df_rets = df_prices / df_prices.shift(1)
-        # df_rets = df_rets.dropna().PRC
+
         df_rets = df_data[['RET', 'PERMNO']].pivot_table(columns='PERMNO', index='date')
         df_rets = df_rets.dropna().RET
 
@@ -109,45 +104,57 @@ class Backtester:
 
     def __create_signals(self, df_data, strategies=['10_max_long', '20_max_long']):
         """
+        Creates the list of stocks to buy in each strategy for each rebalacing date
+
+
         :param df_data: Example
                 PERMNO     PRC      long      hold     short
         date
         20181030  83387.0    8.89  0.149458  0.353090  0.497452
         20181030  84207.0  119.15  0.404111  0.385122  0.210767
-        20181030  83815.0   16.59  0.613428  0.268158  0.118414
+        :param strategies: list of strategies to consider
 
         :return:   dataframe with the permnos to buy for each date # TODO extend it with an extra column weights
-                                             permnos
+                                             10_max_long
         20181120  [85567.0, 83486.0, 83728.0, 83630.0, 85285.0, ...
         20181220  [85539.0, 83762.0, 83844.0, 83885.0, 83532.0, ...
         """
+
         self.log('Creating signals with strategies {}'.format(strategies))
 
         df_permnos_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
         for date in df_data.index:
-            data_sorted = df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
-                by='long', ascending=False)
+            # we test if we need to sort the data since this is time-consuming
+            if np.any([strat_long in strat for strat in strategies for strat_long in ['_max_long','decile_long']]):
+                data_sorted_long = df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
+                    by='long', ascending=False)
+            if np.any(['decile_short' in strat for strat in strategies]):
+                data_sorted_short = df_data[['short', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[
+                    date].sort_values(by='short', ascending=False)
+
             for strat in strategies:
                 if strat == '10_max_long':
-                    list_permnos_to_buy = list(data_sorted.index[:10])
+                    list_permnos_to_buy = list(data_sorted_long.index[:10])
                 elif strat == '20_max_long':
-                    list_permnos_to_buy = list(data_sorted.index[:20])
+                    list_permnos_to_buy = list(data_sorted_long.index[:20])
                 elif strat == '2_max_long':
-                    list_permnos_to_buy = list(data_sorted.index[:2])
+                    list_permnos_to_buy = list(data_sorted_long.index[:2])
                 elif strat == 'threshold':
-                    list_permnos_to_buy = list(data_sorted[data_sorted.long >= 0.75].index)
+                    list_permnos_to_buy = list(df_data[df_data.long >= 0.75].index)
                 elif 'decile_long' in strat:
                     decile = int(strat.split('_')[0])  # format must be '4_decile_long' for the 4th decile
-                    n_stocks = len(data_sorted.index)
+                    n_stocks = len(data_sorted_long.index)
                     list_permnos_to_buy = list(
-                        data_sorted.index[round((decile - 1) * n_stocks / 10.):round(decile * n_stocks / 10.)])
+                        data_sorted_long.index[round((decile - 1) * n_stocks / 10.):round(decile * n_stocks / 10.)])
+                elif 'decile_short' in strat:
+                    decile = int(strat.split('_')[0])  # format must be '4_decile_short' for the 4th decile
+                    n_stocks = len(data_sorted_short.index)
+                    list_permnos_to_buy = list(data_sorted_short.index[round((decile - 1) * n_stocks / 10.):round(decile * n_stocks / 10.)])
                 else:
                     raise NotImplementedError('The strategy {} is not implemented'.format(strat))
                 df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy
         self.log('Signals created')
         return df_permnos_to_buy
-
-    # use df_all_data and builds a df with dates and a return value (first value is one)
 
     def _make_df_for_bckt(self, pred):
         """
@@ -159,9 +166,6 @@ class Backtester:
         date
         20181030  83387.0    1.023  0.149458  0.353090  0.497452
         20181030  84207.0  1.02  0.404111  0.385122  0.210767
-        20181030  83815.0   16.59  0.613428  0.268158  0.118414
-        20181030  83835.0   55.55  0.317590  0.389825  0.292584
-        20181030  83469.0   37.80  0.521703  0.326894  0.151403
 
         :param pred: numpy array shape (N_samples,3)
         :return: Nothing
@@ -175,7 +179,9 @@ class Backtester:
         """
         Restores tensors : x and output and instanciates self._x and self._output
         :param sess: tf.Session
-        :return: Nothing
+        :param latest: bool: set to True to retrive the latest checkpoint.meta file in the specified folder
+
+        Instantiates self._output, self._x, self._phase_train, self._dropout  with tensors retrieved from checkpoint file
         """
         saver = tf.train.import_meta_graph(self._path_model_to_restore)
         folder = os.path.dirname(self._path_model_to_restore)
@@ -195,7 +201,7 @@ class Backtester:
     def run_predictions(self, X):
         """
         Restores a model saved with tensorflow and predicts signals
-        :param X: numpy array shape (N_samples,16,16,4) (if we consider 16 pixels and 4 channels)
+        :param X: numpy array: shape (N_samples,42,42,5) (if we consider 42 pixels and 5 channels)
         :return: predictions as a numpy array shape (N_samples,3)
         """
         self.log('Restoring model and making the predictions')
@@ -204,8 +210,9 @@ class Backtester:
         self.restore_output_op(sess)
         self.log('Model Restored, launching output operation')
 
+        # we run predictions in batches to avoid killing the kernel
         size_1_image = np.prod(X[0].shape)
-        limit_size = 20 * 42 * 42 * 4
+        limit_size = 20 * 42 * 42 * 5
         size_batch = int(limit_size / size_1_image) + 1
         pred = np.zeros((0, 3))
         self.log('To avoid killing the kernel, we run predictions in {} batches'.format(round(len(X) / size_batch)))
@@ -218,7 +225,6 @@ class Backtester:
         self.log('Predictions computed')
         sess.close()
         return pred
-        # must run ouput and add the predictions in the dataframe df_all_data as 3 columns
 
     def plot_backtest(self):
 
@@ -229,8 +235,11 @@ class Backtester:
         - Unpickles data files and gets samples
         - Keeps only the dates we want
 
-        - Instanciates self._df_all_data:
-
+        - Instanciates self._df_all_data: Example
+                                  PERMNO       RET      long      hold     short
+                    date
+                    20181101  79237.0  0.952770  0.019922  0.458449  0.521629
+                    20181101  78877.0  0.991597  0.080810  0.658793  0.260397
         """
         samples_path = self._path_data
         # list of files in the folder: samples_paths
@@ -274,12 +283,10 @@ class Backtester:
         :param df_backt_results:pd.DataFrame: results of the backtest
         :return: pd.DataFrame results with a datetime index and an extra column 'Cash' which is the SPX
         """
-        df_backt_results = df_backt_results.shift(
-            1).dropna()  # because returns in reality do not happen just when we buy, but on next week
+        df_backt_results = df_backt_results.shift(1).dropna()  # because returns in reality do not happen just when we buy, but on next week
         df_strats = df_backt_results.astype(np.float64)
         df_strats = integer_to_timestamp_date_index(df_strats)
-        # df_strats['Cash'] = 1.03**(5./252.)
-        df_strats = df_strats.cumprod()
+        df_strats = df_strats.cumprod() /df_strats.iloc[0]
 
         # we get SPX data and add it to the dataframe
         df_spx = pd.read_csv('data/^GSPC.csv', index_col=0, usecols=['Date', 'Close'])

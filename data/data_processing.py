@@ -438,7 +438,6 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
                                 train_val_size=2 / 3.,
                                 train_size=0.75,
                                 logger_env='Training',
-                                predict=False
                                 ):
     """
     :param samples_path: path for the folder with the data we need: only the files we need need to be in this folder
@@ -455,11 +454,6 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
                                                                                          len(list_file_names),
                                                                                          list_file_names[0]),
         logger_env)
-
-    # if predict:
-    #     columns_df_res = ['PRC', 'PERMNO']
-    #     df_all_data_for_predict = pd.DataFrame(columns=columns_df_res)
-    #     df_all_data_for_predict.index.name ='date'
 
     for i, file_name in enumerate(list_file_names):
         path = os.path.join(samples_path, file_name)
@@ -510,81 +504,10 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
         environment=logger_env)
     log('Test Distribution of Labels :' + text_template.format(tst_d[0] * 100, tst_d[1] * 100, tst_d[2] * 100),
         environment=logger_env)
-    if not predict:
-        return X_train, X_val, X_test, Y_train, Y_val, Y_test
-    # else:
-    #     return
+    return X_train, X_val, X_test, Y_train, Y_val, Y_test
 
 
-# def get_training_data_from_path(samples_path='data/cnn_samples/regular',
-#                                 targets_type='VWAP_targets',
-#                                 train_val_size=2 / 3.,
-#                                 train_size=0.75,
-#                                 logger_env='Training'
-#                                 ):
-#     """
-#     :param samples_path: path for the folder with the data we need: only the files we need need to be in this folder
-#     :param targets_type: str: the targets to consider for this training
-#     :param train_val_size: training/(training+validation)
-#     :param train_size: size of (training+validation)/(training+test+validation)
-#     :return: X_train, X_val, X_test, Y_train, Y_val, Y_test as numpy arrays
-#     """
-#     # list of files in the folder: samples_paths
-#     list_file_names = os.listdir(samples_path)
-#     assert len(list_file_names) >= 1, 'The number of files in the folder {} is probably 0, it must be >=1'.format(
-#         samples_path)
-#     log('******* Getting data from folder: {}, Nb of files : {}, First file : {}'.format(samples_path,
-#                                                                                          len(list_file_names),
-#                                                                                          list_file_names[0]),
-#         logger_env)
-#     for i, file_name in enumerate(list_file_names):
-#         path = os.path.join(samples_path, file_name)
-#         dict_from_pickle = load_pickle(path, logger_env=logger_env)
-#
-#         log('first_date: {}, last_date: {}'.format(dict_from_pickle['first_date'], dict_from_pickle['last_date']),
-#             environment=logger_env)
-#
-#         X = dict_from_pickle['samples']
-#         Y = dict_from_pickle[targets_type]
-#         n_samples = dict_from_pickle['n_samples']
-#
-#         stop_1 = round(train_val_size * n_samples * train_size)
-#         stop_2 = round(n_samples * train_size)
-#         if i == 0:
-#             X_train = X[:stop_1]
-#             Y_train = Y[:stop_1]
-#
-#             X_val = X[stop_1:stop_2]
-#             Y_val = Y[stop_1:stop_2]
-#
-#             X_test = X[stop_2:]
-#             Y_test = Y[stop_2:]
-#         else:
-#
-#             X_train = np.concatenate([X_train, X[:stop_1]])
-#             Y_train = np.concatenate([Y_train, Y[:stop_1]])
-#
-#             X_val = np.concatenate([X_val, X[stop_1:stop_2]])
-#             Y_val = np.concatenate([Y_val, Y[stop_1:stop_2]])
-#
-#             X_test = np.concatenate([X_test, X[stop_2:]])
-#             Y_test = np.concatenate([Y_test, Y[stop_2:]])
-#
-#     # Distributions of Labels
-#     train_d = np.sum(Y_train, axis=0) / len(Y_train)
-#     val_d = np.sum(Y_val, axis=0) / len(Y_val)
-#     tst_d = np.sum(Y_test, axis=0) / len(Y_test)
-#
-#     text_template = 'long: {:5.2f}%, hold: {:5.2f}%, short: {:5.2f}%'
-#     log('Training Distribution of Labels :' + text_template.format(train_d[0] * 100, train_d[1] * 100,
-#                                                                    train_d[2] * 100),
-#         environment=logger_env)
-#     log('Validation Distribution of Labels :' + text_template.format(val_d[0] * 100, val_d[1] * 100, val_d[2] * 100),
-#         environment=logger_env)
-#     log('Test Distribution of Labels :' + text_template.format(tst_d[0] * 100, tst_d[1] * 100, tst_d[2] * 100),
-#         environment=logger_env)
-#
-#     return X_train, X_val, X_test, Y_train, Y_val, Y_test
+
 
 
 def generate_dummy_data(batch_size):
