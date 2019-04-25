@@ -129,7 +129,7 @@ class Backtester:
                     df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy
                 elif strat=='threshold':
                     df_permnos_to_buy.loc[date][strat] = list(data_sorted[data_sorted.long >= 0.85].index)
-                elif strat='long_minus_short':
+                #elif strat=='long_minus_short':
 
                 else:
                     raise NotImplementedError('The strategy {} is not implemented'.format(strat))
@@ -226,24 +226,26 @@ class Backtester:
         for i, file_name in enumerate(list_file_names):
             path = os.path.join(samples_path, file_name)
             df_all_data_one_batch = load_pickle(path, logger_env=self.__LOGGER_ENV)
-            self.log('first_date: {}, last_date: {}'.format(df_all_data_one_batch.index[0], df_all_data_one_batch.index[-1]))
+            data_index_list = df_all_data_one_batch.index
+            self.log('first_date: {}, last_date: {}'.format(data_index_list[0], data_index_list[-1]))
             # Keeping only the dates we want for the backtest
-            df_all_data_one_batch = df_all_data_one_batch.loc[self._start_date:self._end_date]
-            self.log('new first_date: {}, new last_date: {}'.format(df_all_data_one_batch.index[0], df_all_data_one_batch.index[-1]))
+            df_selected_data_one_batch = df_all_data_one_batch.loc[self._start_date:self._end_date]
+            selected_data_index_list = df_selected_data_one_batch.index
+            self.log('new first_date: {}, new last_date: {}'.format(selected_data_index_list[0], selected_data_index_list[-1]))
 
             # in each of the pickle files the data is sorted in chronologic order we resort in case it is not
-            df_all_data_one_batch = df_all_data_one_batch.sort_index()
-            X = np.concatenate([[sample for sample in df_all_data_one_batch['sample'].values]],
+            df_selected_data_one_batch = df_selected_data_one_batch.sort_index()
+            X = np.concatenate([[sample for sample in df_selected_data_one_batch['sample'].values]],
                                axis=0)  # need this to get an array
-            # Y = np.concatenate([[sample for sample in df_all_data_one_batch[targets_type].values]], axis=0)
+            # Y = np.concatenate([[sample for sample in df_selected_data_one_batch[targets_type].values]], axis=0)
             # n_samples = Y.shape[0]
-            df_all_data_one_batch_for_bckt = df_all_data_one_batch[['PERMNO', 'RET']]
+            df_selected_data_one_batch_for_bckt = df_selected_data_one_batch[['PERMNO', 'RET']]
             if i == 0:
                 X_res = X
-                df_all_data = df_all_data_one_batch_for_bckt
+                df_all_data = df_selected_data_one_batch_for_bckt
             else:
                 X_res = np.concatenate([X_res, X])
-                df_all_data = pd.concat([df_all_data, df_all_data_one_batch_for_bckt])
+                df_all_data = pd.concat([df_all_data, df_selected_data_one_batch_for_bckt])
         # now we must not change the order in X_res and df_all_data
         self._df_all_data = df_all_data
         return X_res
