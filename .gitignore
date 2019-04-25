@@ -1,5 +1,4 @@
 *.pickle
-*.csv
 
 logs/
 model_checkpoints/
