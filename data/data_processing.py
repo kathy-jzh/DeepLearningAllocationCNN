@@ -142,7 +142,7 @@ class DataHandler:
         _short = [0, 0, 1]
         rebalance_indexes = []
         df_rolling_ret = np.exp(np.log(data.RET).rolling(window=retrain_freq).sum())  # product of returns
-        print(df_rolling_ret)
+        # print(df_rolling_ret)
         df_rolling_std = data.RET.rolling(window=window_len).std() * np.sqrt(252.)
 
         for i in range(window_len, n_sample, retrain_freq):
