@@ -41,6 +41,7 @@ class Backtester:
         df_strats = integer_to_timestamp_date_index(df_strats)
         # df_strats['Cash'] = 1.03**(5./252.)
         df_strats = df_strats.cumprod()
+        print(df_strats)
 
         # we get SPX data and add it to the dataframe
         df_spx = pd.read_csv('data/^GSPC.csv', index_col=0, usecols=['Date', 'Close'])
@@ -48,6 +49,7 @@ class Backtester:
         df_spx.columns = ['Cash'] # Columns that will be used to compute sharpe ratio
         df_spx.index = pd.to_datetime(df_spx.index)
         df_strats = pd.merge(df_strats, df_spx, how='left', on='date')
+
         df_strats['Cash'] = df_strats['Cash']/df_strats['Cash'].iloc[0]
 
 
@@ -94,6 +96,7 @@ class Backtester:
                     df_results.loc[date][strat] = 1. # we buy nothing
                 else:
                     df_results.loc[date][strat] = df_rets.loc[date][list_permnos_to_buy].mean()
+        print("df_results", df_results)
         return df_results
 
 
