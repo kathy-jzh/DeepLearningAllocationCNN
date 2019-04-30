@@ -15,7 +15,7 @@ def train_predict(X, Y, valX, valY,
                   cost_matrix=np.array([[0, 1.1, 1.3], [1.1, 0, 1.1], [1.3, 1.1, 0]]),
                   is_bayesian=False,
                   batch_size=128, epochs=50, save_step=10, display_step=1,
-                  restore=False,model_ckpt_path_to_restore=None, **kwargs):
+                  restore=False, model_ckpt_path_to_restore=None, **kwargs):
     """ Function to train and make prediction with models
 
         Args:

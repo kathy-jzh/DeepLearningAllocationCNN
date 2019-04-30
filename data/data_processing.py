@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 
-from pyts.image import GADF, GASF, MTF
+# from pyts.image import GADF, GASF, MTF
 from pykalman import KalmanFilter
 
 from utils import load_pickle, log, dump_pickle, remove_all_files_from_dir
@@ -114,14 +114,30 @@ class DataHandler:
 
         data = df_window_data.reset_index().set_index('date').drop('PERMNO', axis=1).T
         if self._encoding_method == 'GADF':
-            gadf = GADF(self._image_size)
+            # from pyts.image import GADF, GASF, MTF
+            try:
+                from pyts.image import GADF
+                gadf = GADF(self._image_size)
+            except:
+                from pyts.image import GramianAngularField
+                gadf = GramianAngularField(self._image_size, method='difference')
             image_data = (gadf.fit_transform(data).T)
 
         elif self._encoding_method == 'GASF':
-            gasf = GASF(self._image_size)
+            try:
+                from pyts.image import GASF
+                gasf = GASF(self._image_size)
+            except:
+                from pyts.image import GramianAngularField
+                gasf = GramianAngularField(self._image_size, method='summation')
             image_data = (gasf.fit_transform(data).T)
         elif self._encoding_method == 'MTF':
-            gasf = MTF(self._image_size)
+            try:
+                from pyts.image import MTF
+                mtf = MTF(self._image_size)
+            except:
+                from pyts.image import MarkovTransitionField
+                mtf = MarkovTransitionField(self._image_size)
             image_data = (gasf.fit_transform(data).T)
         else:
             raise BaseException('Method must be either GADF, GASF or MTF not {}'.format(self._encoding_method))
@@ -245,14 +261,29 @@ class DataHandler:
                 window_data = window_data.T
 
             if encoding_method == 'GADF':
-                gadf = GADF(image_size)
+                try:
+                    from pyts.image import GADF
+                    gadf = GADF(image_size)
+                except:
+                    from pyts.image import GramianAngularField
+                    gadf = GramianAngularField(image_size, method='difference')
                 samples_list.append(gadf.fit_transform(window_data).T)
 
             elif encoding_method == 'GASF':
-                gasf = GASF(image_size)
+                try:
+                    from pyts.image import GASF
+                    gasf = GASF(image_size)
+                except:
+                    from pyts.image import GramianAngularField
+                    gasf = GramianAngularField(image_size, method='summation')
                 samples_list.append(gasf.fit_transform(window_data).T)
             elif encoding_method == 'MTF':
-                mtf = MTF(image_size)
+                try:
+                    from pyts.image import MTF
+                    mtf = MTF(image_size)
+                except:
+                    from pyts.image import MarkovTransitionField
+                    mtf = MarkovTransitionField(image_size)
                 samples_list.append(mtf.fit_transform(window_data).T)
             else:
                 raise BaseException('Method must be either GADF, GASF or MTF not {}'.format(encoding_method))
