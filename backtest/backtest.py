@@ -122,15 +122,32 @@ class Backtester:
 
         self.log('Creating signals with strategies {}'.format(strategies))
 
+        data_sorted_long_all_dates = df_data.reset_index().sort_values(by='long', ascending=False).set_index('date')
+        data_sorted_short_all_dates = df_data.reset_index().sort_values(by='short', ascending=False).set_index('date')
+        df_temp = df_data.copy()
+        df_temp['long_short'] = df_temp.long - 0.4 * df_temp.short
+        data_sorted_long_short_all_dates = df_temp.reset_index().sort_values(by='long_short', ascending=False).set_index('date')
+
         df_permnos_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
         for date in df_data.index:
-            # we test if we need to sort the data since this is time-consuming
-            if np.any([strat_long in strat for strat in strategies for strat_long in ['_max_long','decile_long']]):
-                data_sorted_long = df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
-                    by='long', ascending=False)
-            if np.any(['decile_short' in strat for strat in strategies]):
-                data_sorted_short = df_data[['short', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[
-                    date].sort_values(by='short', ascending=False)
+            data_sorted_long = data_sorted_long_all_dates.loc[date].set_index('PERMNO')
+            data_sorted_short = data_sorted_short_all_dates.loc[date].set_index('PERMNO')
+            data_sorted_long_short = data_sorted_long_short_all_dates.loc[date].set_index('PERMNO')
+
+
+
+            # # we test if we need to sort the data since this is time-consuming
+            # if np.any([strat_long in strat for strat in strategies for strat_long in ['_max_long','decile_long']]):
+            #     data_sorted_long = df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
+            #         by='long', ascending=False)
+            # if np.any(['decile_short' in strat for strat in strategies]):
+            #     data_sorted_short = df_data[['short', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[
+            #         date].sort_values(by='short', ascending=False)
+            # if np.any(['long_short' in strat for strat in strategies]):
+            #     df_temp = df_data[['short','long','PERMNO']]
+            #     df_temp['long_short'] = df_temp.long - 0.4 * df_temp.short
+            #     data_sorted_long_short = df_temp[['long_short', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[
+            #         date].sort_values(by='long_short', ascending=False)
 
             for strat in strategies:
                 if strat == '10_max_long':
@@ -140,7 +157,7 @@ class Backtester:
                 elif strat == '2_max_long':
                     list_permnos_to_buy = list(data_sorted_long.index[:2])
                 elif strat == 'threshold':
-                    list_permnos_to_buy = list(df_data[df_data.long >= 0.75].index)
+                    list_permnos_to_buy = list(data_sorted_long[data_sorted_long.long >= 0.75].index)
                 elif 'decile_long' in strat:
                     decile = int(strat.split('_')[0])  # format must be '4_decile_long' for the 4th decile
                     n_stocks = len(data_sorted_long.index)
@@ -150,6 +167,11 @@ class Backtester:
                     decile = int(strat.split('_')[0])  # format must be '4_decile_short' for the 4th decile
                     n_stocks = len(data_sorted_short.index)
                     list_permnos_to_buy = list(data_sorted_short.index[round((decile - 1) * n_stocks / 10.):round(decile * n_stocks / 10.)])
+                elif 'decile_long_short' in strat:
+                    decile = int(strat.split('_')[0])  # format must be '4_decile_long_short' for the 4th decile
+                    n_stocks = len(data_sorted_long_short.index)
+                    list_permnos_to_buy = list(
+                        data_sorted_long_short.index[round((decile - 1) * n_stocks / 10.):round(decile * n_stocks / 10.)])
                 else:
                     raise NotImplementedError('The strategy {} is not implemented'.format(strat))
                 df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy
