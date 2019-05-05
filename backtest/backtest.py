@@ -28,8 +28,8 @@ class Backtester:
         :param start_date:int: first date to consider for the backtest (format yyyymmdd)
         :param end_date:int:  last date to consider for the backtest
         :param strategies:list: list of strategies to backtest (see Backtester.__create_signals for supported names)
-        :param num_bins:int:  number of bins in the backtesting strategy
         :param network_name:str: name of the network to restore (used when restoring tensors)
+        :param num_bins:int: number of bins in case we want to backtest a family of strategies
         """
         self._path_model_to_restore = path_model_to_restore
         self._name_network = network_name
@@ -85,9 +85,7 @@ class Backtester:
         # TODO modify the function to support different strategies, make a column weights in df_permnos_to_buy
         df_data = self._df_all_data
         strategies = self._strategies
-        num_bins = self._num_bins
-        self._df_permnos_to_buy, self._df_weights_to_buy = self.__create_signals(df_data,
-                                                                              strategies=strategies, bins=num_bins)
+        self._df_permnos_to_buy = self.__create_signals(df_data,strategies=self._strategies, bins=self._num_bins)
         # self._df_permnos_to_buy = self._df_permnos_to_buy.shift(1).dropna() # because if we buy at i we get returns in i+1, not here
         # In the data returns at date i are the returns we would get if we buy at i
 
@@ -100,8 +98,7 @@ class Backtester:
         df_results = pd.DataFrame(columns=strategies, index=self._df_permnos_to_buy.index)
         for date in self._df_permnos_to_buy.index:
             for strat in strategies:
-                list_permnos_to_buy = self._df_permnos_to_buy.loc[date][strat]
-                weight_permnos_to_buy = self._df_weights_to_buy.loc[date][strat]
+                list_permnos_to_buy,weight_permnos_to_buy = self._df_permnos_to_buy.loc[date][strat]
                 if len(list_permnos_to_buy) == 0:
                     df_results.loc[date][strat] = 1.  # we buy nothing
                 else:
@@ -120,92 +117,69 @@ class Backtester:
         20181030  84207.0  119.15  0.404111  0.385122  0.210767
         :param strategies: list of strategies to consider
 
-        :return:   dataframe1 with the permnos to buy for each date;
-                   dataframe2 with the weight of each stock proportional to its predicted possibilities
+        :return:   dataframe1 with the permnos to buy for each date and the associated weights
 
         # df_permnos_to_buy
-                                           10_max_long
-        20181120  [85567.0, 83486.0, 83728.0, 83630.0, 85285.0, ...
-        20181220  [85539.0, 83762.0, 83844.0, 83885.0, 83532.0, ...
+                                           4_max_long
+        20181120  [85567.0, 83486.0, 83728.0, 83630.0],[0.42,0.08 ...]
+        20181220  [85539.0, 83762.0, 83844.0, 83885.0],[0.05,0.048 ...]
 
-        # df_weights_to_buy
-                                          10_max_long
-        20181120  [0.12,    0.13,   0.44, ...
-        20181220  [0.43,    0.22,   0.04, ...
+
         """
         self.log('Creating signals with strategies {}'.format(strategies))
 
+        # we sort the predictions
         data_sorted_long_all_dates = df_data.reset_index().sort_values(by='long', ascending=False).set_index('date')
         data_sorted_short_all_dates = df_data.reset_index().sort_values(by='short', ascending=False).set_index('date')
         df_temp = df_data.copy()
         df_temp['long_short'] = df_temp.long - 0.4 * df_temp.short
         data_sorted_long_short_all_dates = df_temp.reset_index().sort_values(by='long_short', ascending=False).set_index('date')
 
+        # empty dataframe that will be used to store results
         df_permnos_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
-        df_weights_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
+
+        # make weights proportionnal to the signal we consider
+        def get_proportionnal_weights(data_sorted, list_permnos_to_buy):
+            weight_permnos = data_sorted.loc[list_permnos_to_buy].values.T[0]
+            weight_permnos = weight_permnos / weight_permnos.sum()
+            return weight_permnos
+        def perform_bin_strategy(data_sorted):
+            bin = int(strat.split('_')[0])  # format must be '4_bins_...' for the 4th bin
+            n_stocks = len(data_sorted.index)
+            list_permnos_to_buy = list(data_sorted.index[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)])
+            weight_permnos = get_proportionnal_weights(data_sorted, list_permnos_to_buy)
+            return list_permnos_to_buy,weight_permnos
+
 
         for date in df_data.index:
-            data_sorted_long = data_sorted_long_all_dates.loc[date].set_index('PERMNO')
-            data_sorted_short = data_sorted_short_all_dates.loc[date].set_index('PERMNO')
-            data_sorted_long_short = data_sorted_long_short_all_dates.loc[date].set_index('PERMNO')
-
-
-
-            # # we test if we need to sort the data since this is time-consuming
-            # if np.any([strat_long in strat for strat in strategies for strat_long in ['_max_long','decile_long']]):
-            #     data_sorted_long = df_data[['long', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[date].sort_values(
-            #         by='long', ascending=False)
-            # if np.any(['decile_short' in strat for strat in strategies]):
-            #     data_sorted_short = df_data[['short', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[
-            #         date].sort_values(by='short', ascending=False)
-            # if np.any(['long_short' in strat for strat in strategies]):
-            #     df_temp = df_data[['short','long','PERMNO']]
-            #     df_temp['long_short'] = df_temp.long - 0.4 * df_temp.short
-            #     data_sorted_long_short = df_temp[['long_short', 'PERMNO']].reset_index().set_index(['date', 'PERMNO']).loc[
-            #         date].sort_values(by='long_short', ascending=False)
+            data_sorted_long = data_sorted_long_all_dates.loc[date].set_index('PERMNO')[['long']]
+            data_sorted_short = data_sorted_short_all_dates.loc[date].set_index('PERMNO')[['short']]
+            data_sorted_long_short = data_sorted_long_short_all_dates.loc[date].set_index('PERMNO')[['long_short']]
 
             for strat in strategies:
                 if strat == '10_max_long':
                     list_permnos_to_buy = list(data_sorted_long.index[:10])
-                    weight_permnos = data_sorted_long.values.reshape(-1)[:10] / data_sorted_long.values.reshape(-1)[:10].sum()
+                    weight_permnos = get_proportionnal_weights(data_sorted_long, list_permnos_to_buy)
                 elif strat == '20_max_long':
                     list_permnos_to_buy = list(data_sorted_long.index[:20])
-                    weight_permnos = data_sorted_long.values.reshape(-1)[:20] / data_sorted_long.values.reshape(-1)[:20].sum()
+                    weight_permnos = get_proportionnal_weights(data_sorted_long, list_permnos_to_buy)
                 elif strat == '2_max_long':
                     list_permnos_to_buy = list(data_sorted_long.index[:2])
-                    weight_permnos = data_sorted_long.values.reshape(-1)[:2] / data_sorted_long.values.reshape(-1)[:2].sum()
+                    weight_permnos = get_proportionnal_weights(data_sorted_long, list_permnos_to_buy)
                 elif strat == 'threshold':
                     list_permnos_to_buy = list(df_data[df_data.long >= 0.75].index)
-                    weight_permnos = data_sorted_long.query("long">=0.75).values.reshape(-1)
-                    weight_permnos = weight_permnos / weight_permnos.sum()
+                    weight_permnos = get_proportionnal_weights(data_sorted_long, list_permnos_to_buy)
                 elif 'bins_long' in strat:
-                    # if bins=10 then it's decile long
-                    bin = int(strat.split('_')[0])  # format must be '4_bins_long' for the 4th bin
-                    list_permnos_to_buy = list(data_sorted_long[data_sorted_long.long >= 0.75].index)
-                elif 'decile_long' in strat:
-                    decile = int(strat.split('_')[0])  # format must be '4_decile_long' for the 4th decile
-                    n_stocks = len(data_sorted_long.index)
-                    list_permnos_to_buy = list(data_sorted_long.index[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)])
-                    weight_permnos = data_sorted_long.values.reshape(-1)[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)]
-                    weight_permnos = weight_permnos / weight_permnos.sum()
+                    list_permnos_to_buy,weight_permnos = perform_bin_strategy(data_sorted_long)
                 elif 'bins_short' in strat:
-                    bin = int(strat.split('_')[0])  # format must be '4_bins_short' for the 4th bin
-                    n_stocks = len(data_sorted_short.index)
-                    list_permnos_to_buy = list(data_sorted_short.index[round((decile - 1) * n_stocks / 10.):round(decile * n_stocks / 10.)])
-                elif 'decile_long_short' in strat:
-                    decile = int(strat.split('_')[0])  # format must be '4_decile_long_short' for the 4th decile
-                    n_stocks = len(data_sorted_long_short.index)
-                    list_permnos_to_buy = list(
-                        data_sorted_long_short.index[round((decile - 1) * n_stocks / 10.):round(decile * n_stocks / 10.)])
-                    list_permnos_to_buy = list(data_sorted_short.index[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)])
-                    weight_permnos = data_sorted_short.values.reshape(-1)[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)]
-                    weight_permnos = weight_permnos / weight_permnos.sum()
+                    list_permnos_to_buy,weight_permnos = perform_bin_strategy(data_sorted_short)
+                elif 'bins_long_short' in strat:
+                    list_permnos_to_buy,weight_permnos = perform_bin_strategy(data_sorted_long_short)
                 else:
                     raise NotImplementedError('The strategy {} is not implemented'.format(strat))
-                df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy
-                df_weights_to_buy.loc[date][strat] = weight_permnos
+                df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy,weight_permnos
         self.log('Signals created')
-        return df_permnos_to_buy, df_weights_to_buy
+        return df_permnos_to_buy
 
     def _make_df_for_bckt(self, pred):
         """
@@ -331,8 +305,8 @@ class Backtester:
     @staticmethod
     def _format_df_strats(df_backt_results):
         """
-        :param df_backt_results:pd.DataFrame: results of the backtest
-        :return: pd.DataFrame results with a datetime index and an extra column 'Cash' which is the SPX
+        :param df_backt_results:pd.DataFrame: results of the backtest data by date
+        :return: pd.DataFrame cumulative results with a datetime index and an extra column 'Cash' which is the SPX
         """
         df_backt_results = df_backt_results.shift(1).dropna()  # because returns in reality do not happen just when we buy, but on next week
         df_strats = df_backt_results.astype(np.float64)
