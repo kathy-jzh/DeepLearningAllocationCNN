@@ -126,7 +126,6 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
             X_batch,Y_batch = valX[batch:batch + size_batch],valY[batch:batch + size_batch]
             if X_batch.shape[0]==0:
                 break
-            # print(X_batch.shape)
             pred_batch, epoch_val_loss_batch = sess.run([net.output, net.loss],
                                                              feed_dict={net.x: X_batch, net.y: Y_batch,net.phase_train:False,net.dropout:0.})
             output_val = np.concatenate([output_val, pred_batch])
