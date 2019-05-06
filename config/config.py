@@ -78,7 +78,6 @@ inception3_hyperparam = {
 }
 first_block_gglnet_hyperparam = {
     # 1st convolutional layer block
-    # "conv1_conv_kernel": (4,4,4,16),
     "conv1_conv_kernel": (4, 4, 5, 16),
 
     # 2nd convolutional layer block

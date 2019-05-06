@@ -117,7 +117,7 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
 
         # run validation in batches to avoid memory problems
         size_1_image = np.prod(valX[0].shape)
-        limit_size = (5*batch_size) * 42 * 42 * 5
+        limit_size = (10*batch_size) * 42 * 42 * 5
         size_batch = int(limit_size / size_1_image) + 1
         output_val,epoch_val_loss= np.zeros((0, 3)), 0.
         nb_batches = round(len(X) / size_batch)
