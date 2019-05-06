@@ -2,7 +2,7 @@ import tensorflow as tf
 import os
 
 from models.net import Net
-from config.hyperparams import DEFAULT_LOG_ENV
+from config.config import DEFAULT_LOG_ENV
 
 # todo do functions for every block so that the graph is easier to read
 

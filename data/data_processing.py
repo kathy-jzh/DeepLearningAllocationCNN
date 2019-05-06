@@ -2,12 +2,13 @@ import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+from IPython.display import display,Markdown
 
 # from pyts.image import GADF, GASF, MTF
 from pykalman import KalmanFilter
 
 from utils import load_pickle, log, dump_pickle, remove_all_files_from_dir
-from config.hyperparams import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_START_DATE, PERMNOS_to_avoid
+from config.config import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_START_DATE
 
 
 class DataHandler:
@@ -110,7 +111,20 @@ class DataHandler:
 
         # self.__delete_df_data_from_memory()
 
-    def show_image(self, df_window_data):
+    def show_multichannels_images(self):
+        """
+
+        """
+        assert len(self._stocks_list)>0, 'There is less than one permno available'
+        permno = self._stocks_list[0]
+        df_window_data = self.df_data.loc[permno][-self._image_size:]
+        dates = df_window_data.date.iloc[0],df_window_data.date.iloc[-1]
+
+        msg = '### Showing encoded images with method {} for the stock {} between {} and {} '.format(self._encoding_method,permno,dates[0],dates[1])
+        display(Markdown(msg))
+        self._show_images(df_window_data)
+
+    def _show_images(self, df_window_data):
         """
         Plots a multi dimensional timeseries encoded as an image
         :param df_window_data: timeseries we want to encode as an image
