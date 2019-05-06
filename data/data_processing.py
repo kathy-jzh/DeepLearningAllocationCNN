@@ -11,7 +11,7 @@ from config.hyperparams import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_ST
 
 
 class DataHandler:
-    def __init__(self, encoding_method='GADF', window_len=64, image_size=16, retrain_freq=5,
+    def __init__(self, encoding_method='GADF', window_len=42, image_size=42, retrain_freq=5,
                  start_date: int = DEFAULT_START_DATE, targets_methods=['close'], minimum_volume=1e6,
                  end_date: int = DEFAULT_END_DATE, frac_of_stocks=1.,
                  stock_data_dir_path: str = 'data/2019_2010_stock_data',
@@ -56,7 +56,7 @@ class DataHandler:
 
         :return: Nothing
         """
-        # TODO instead of writing the files names here just get a list of names from the folder
+
         nb_files_to_get = max(round(self._frac_of_stocks_to_get * self._N_FILES_CRSP), 1)
         choices = np.random.choice(np.arange(1, self._N_FILES_CRSP + 1), nb_files_to_get, replace=False)
         file_names = ['stockdata_{}'.format(i) for i in choices]
@@ -111,10 +111,14 @@ class DataHandler:
         # self.__delete_df_data_from_memory()
 
     def show_image(self, df_window_data):
+        """
+        Plots a multi dimensional timeseries encoded as an image
+        :param df_window_data: timeseries we want to encode as an image
+        """
 
         data = df_window_data.reset_index().set_index('date').drop('PERMNO', axis=1).T
+        channels = list(data.index)
         if self._encoding_method == 'GADF':
-            # from pyts.image import GADF, GASF, MTF
             try:
                 from pyts.image import GADF
                 gadf = GADF(self._image_size)
@@ -138,12 +142,23 @@ class DataHandler:
             except:
                 from pyts.image import MarkovTransitionField
                 mtf = MarkovTransitionField(self._image_size)
-            image_data = (gasf.fit_transform(data).T)
+            image_data = (mtf.fit_transform(data).T)
         else:
             raise BaseException('Method must be either GADF, GASF or MTF not {}'.format(self._encoding_method))
 
-        plt.imshow(image_data, cmap='rainbow', origin='lower')
-        plt.title(self._encoding_method, fontsize=16)
+        num_channels = image_data.shape[-1]
+        plt.figure(figsize=(12, 14))
+        for j in range(1, num_channels + 1):
+            channel = image_data[:,:,j-1]
+            plt.subplot(int(num_channels/2) +1,2,j)
+            plt.imshow(channel, cmap='rainbow', origin='lower')
+            plt.xlabel('$time$')
+            plt.ylabel('$time$')
+            plt.title(channels[j-1])
+            plt.tight_layout()
+
+        plt.show()
+
 
     @staticmethod
     def _build_close_returns(df, window_len=64, retrain_freq=5, up_return=0.0125, down_return=-0.0125,
@@ -237,28 +252,12 @@ class DataHandler:
         return np.asarray(targets), df_for_backtest
 
     @staticmethod
-    def _build_images_one_stock(df_one_permno, window_len, retrain_freq, encoding_method, image_size,
-                                use_smoothed_data=False):
+    def _build_images_one_stock(df_one_permno, window_len, retrain_freq, encoding_method, image_size):
 
         n_days = df_one_permno.T.shape[-1]
         samples_list, dates_list, prc_list = [], [], []
         for i in range(window_len, n_days, retrain_freq):
             window_data = df_one_permno.T.iloc[:, i - window_len:i]
-            # date = df_one_permno.index[i - 1]
-            # dates_list.append(date)
-            # prc_list.append(df_one_permno.loc[date, 'PRC'])
-
-            # todo we probably should use this on prices not on returns
-            if use_smoothed_data:
-                Smoother = KalmanFilter(n_dim_obs=window_data.shape[0], n_dim_state=window_data.shape[0],
-                                        em_vars=['transition_matrices', 'observation_matrices',
-                                                 'transition_offsets', 'observation_offsets',
-                                                 'transition_covariance', 'observation_convariance',
-                                                 'initial_state_mean', 'initial_state_covariance'])
-                measurements = window_data.T.values
-                Smoother.em(measurements, n_iter=5)
-                window_data, _ = Smoother.smooth(measurements)
-                window_data = window_data.T
 
             if encoding_method == 'GADF':
                 try:
@@ -288,9 +287,7 @@ class DataHandler:
             else:
                 raise BaseException('Method must be either GADF, GASF or MTF not {}'.format(encoding_method))
         samples_list = np.asarray(samples_list)
-        # dates_list = np.asarray(dates_list)
-        # prc_list = np.asarray(prc_list)
-        return samples_list  # , dates_list, prc_list
+        return samples_list
 
     def _build_images_one_batch(self, df_batch_data, batch_name, use_smoothed_data=False):
         self.log('Building Targets and Images for batch {}'.format(batch_name), )
