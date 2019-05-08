@@ -279,12 +279,13 @@ class Backtester:
         for i, file_name in enumerate(list_file_names):
             path = os.path.join(samples_path, file_name)
             df_all_data_one_batch = load_pickle(path, logger_env=self.__LOGGER_ENV)
+            index_list = list(df_all_data_one_batch.index)
             self.log(
-                'first_date: {}, last_date: {}'.format(df_all_data_one_batch.index[0], df_all_data_one_batch.index[-1]))
+                'first_date: {}, last_date: {}'.format(index_list[0], index_list[-1]))
             # Keeping only the dates we want for the backtest
             df_all_data_one_batch = df_all_data_one_batch.loc[self._start_date:self._end_date]
-            self.log('new first_date: {}, new last_date: {}'.format(df_all_data_one_batch.index[0],
-                                                                    df_all_data_one_batch.index[-1]))
+            self.log('new first_date: {}, new last_date: {}'.format(index_list[0],
+                                                                    index_list[-1]))
 
             # in each of the pickle files the data is sorted in chronologic order we resort just in case
             df_all_data_one_batch = df_all_data_one_batch.sort_index()

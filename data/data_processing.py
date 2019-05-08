@@ -252,7 +252,8 @@ class DataHandler:
         return np.asarray(targets), df_for_backtest
 
     @staticmethod
-    def _build_images_one_stock(df_one_permno, window_len, retrain_freq, encoding_method, image_size):
+    def _build_images_one_stock(df_one_permno, window_len, retrain_freq, encoding_method, image_size,
+                                use_smoothed_data=False):
 
         n_days = df_one_permno.T.shape[-1]
         samples_list, dates_list, prc_list = [], [], []
