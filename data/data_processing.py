@@ -22,6 +22,19 @@ class DataHandler:
                  frac_of_stocks=1., minimum_volume=1e6,
                  stock_data_dir_path: str = 'data/2019_2010_stock_data', dir_for_samples='data/cnn_samples/regular',
                  nb_of_stocks_by_file=50, nb_files_to_read: int = 34,
+
+    def __init__(self, encoding_method='GADF',
+                 window_len=42,
+                 image_size=42,
+                 retrain_freq=5,
+                 start_date: int = DEFAULT_START_DATE,
+                 end_date: int = DEFAULT_END_DATE,
+                 frac_of_stocks=1.,
+                 minimum_volume=1e6,
+                 stock_data_dir_path: str = 'data/2019_2010_stock_data',
+                 dir_for_samples='data/cnn_samples/regular',
+                 nb_of_stocks_by_file=50,
+                 nb_files_to_read: int = 34,
                  ):
         """
         :param encoding_method: including GADF, GASF, MTF
@@ -228,6 +241,7 @@ class DataHandler:
             labels_array, df_for_backtest, prc_list, dates_list = self._build_close_returns(df_one_permno,
                                                                                             self._window_len,
                                                                                             self._retrain_freq,)
+                                                                                            self._retrain_freq)
 
             # building dataframe
             df_res_one_permno = pd.DataFrame(columns=columns_df_res)
