@@ -35,7 +35,6 @@ def plot_highstock_with_table(df, title=''):
     return g.plot_with_table_1(save=False, dated=True, version='latest')
 
 
-
 def integer_to_timestamp_date_index(df):
     df.index.name = 'date'
     df = df.reset_index()
@@ -100,6 +99,7 @@ def load_pickle(path: str, logger_env='Pickles'):
     return res
 
 
+# remove original files in the dir path
 def remove_all_files_from_dir(directory, logger_env=None):
     _ensure_or_make_dir(directory=directory, logger_env=logger_env)
     files_to_remove = os.listdir(directory)
@@ -109,6 +109,7 @@ def remove_all_files_from_dir(directory, logger_env=None):
     log('Files {} removed from folder {}'.format(files_to_remove, directory), environment=logger_env)
 
 
+# create dir path if it doesn't exist
 def _ensure_or_make_dir(directory=None, file_path=None, logger_env=None):
     assert (directory is not None) ^ (
             file_path is not None), 'only one of the args: file_path or directory, must be none to test or make a directory'

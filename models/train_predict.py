@@ -56,7 +56,6 @@ def train_predict(X, Y, valX, valY,
         expected_penalty = None
     kwargs.update({'expected_penalty': expected_penalty})
 
-
     if restore:
         tf.reset_default_graph()
         sess = tf.Session()
@@ -75,9 +74,9 @@ def train_predict(X, Y, valX, valY,
                     return _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_training,batch_size,display_step,save_step,model_ckpt_path,is_bayesian)
 
 
-
-
-def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_training,batch_size,display_step,save_step,model_ckpt_path,is_bayesian):
+def _run_epochs(restore, sess, net, X, Y, valX, valY, sample_size, epochs,
+                nb_of_batches_training, batch_size, display_step,
+                save_step, model_ckpt_path, is_bayesian):
     writer = tf.summary.FileWriter('logs', sess.graph)
 
     dropout = net.get_dropout()

@@ -299,39 +299,3 @@ class CondensedAlexNet(Net):
         self._pre_thresholded_output = x
         self.output = tf.nn.softmax(x,name='outputs')
 
-
-#
-# def VAE_alexnet(inputs, hyperparams=VAE_hyperparam, dropout=0.2, hidden_dim=150):
-#     batch_size, _, image_size, channel_size = inputs.shape
-#     inputs = tf.reshape(inputs, [-1, image_size, image_size, channel_size])
-#
-#     # Encoding part
-#     x = tf.nn.conv2d(inputs, filter=hyperparams['encoder_conv1_kernel'], strides=[1, 1, 1, 1], padding="SAME",
-#                      name="encoder_conv1")
-#     x = add_bias(x)
-#     x = tf.nn.conv2d(x, filter=hyperparams['encoder_conv2_kernel'], strides=[1, 1, 1, 1], paddnig="SAME",
-#                      name="encoder_conv2")
-#     x = add_bias(x)
-#
-#     m, v = tf.nn.moments(x)
-#     x = tf.nn.batch_normalization(x, mean=m, variance=v, scale=None, offset=None, variance_epsilon=1e-7)
-#     x = tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 1, 1, 1], padding="SAME", name="encoder_maxpool")
-#     x = tf.nn.dropout(x, keep_prob=1 - dropout)
-#     x = tf.layers.flatten(x)
-#
-#     hidden, mu, log_sigma2 = dense_layer(x, units=hidden_dim), dense_layer(x, units=hidden_dim), dense_layer(x,
-#                                                                                                              units=hidden_dim)
-#
-#     # Decoding part
-#     x = dense_layer(hidden, units=image_size * image_size * channel_size)
-#     x = tf.nn.dropout(x, keep_prob=1 - dropout)
-#     x = tf.reshape(x, [-1, image_size, image_size, channel_size])
-#     x = tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 1, 1, 1], padding="SAME", name="decoder_maxpool")
-#     x = tf.nn.conv2d(inputs, filter=hyperparams['decoder_conv1_kernel'], strides=[1, 1, 1, 1], padding="SAME",
-#                      name="encoder_conv1")
-#     x = add_bias(x)
-#     x = tf.nn.conv2d(x, filter=hyperparams['decoder_conv2_kernel'], strides=[1, 1, 1, 1], paddnig="SAME",
-#                      name="encoder_conv2")
-#     output = add_bias(x)
-#
-#     return output, hidden, mu, log_sigma2

@@ -9,26 +9,38 @@ from config.config import DEFAULT_FILES_NAMES, DEFAULT_END_DATE, DEFAULT_START_D
 
 
 class DataHandler:
-    def __init__(self, encoding_method='GADF',
-                 window_len=42,
-                 image_size=42,
-                 retrain_freq=5,
-                 start_date: int = DEFAULT_START_DATE,
-                 end_date: int = DEFAULT_END_DATE,
-                 frac_of_stocks=1.,
-                 minimum_volume=1e6,
-                 stock_data_dir_path: str = 'data/2019_2010_stock_data',
-                 dir_for_samples='data/cnn_samples/regular',
-                 nb_of_stocks_by_file=50,
-                 nb_files_to_read: int = 34,
-                 kwargs_target_methods=None
+    """
+    DataHandler aims to:
+        - Constructs features that will be used later
+        - Builds labels using returns thresholds and volatility
+        - Build long / hold / short strategies
+        - Transform stock data with time series into images
+        - Pickles dataframes on disk with keys/values
+    """
+    def __init__(self, encoding_method='GADF', window_len=42, image_size=42, retrain_freq=5,
+                 start_date: int = DEFAULT_START_DATE, end_date: int = DEFAULT_END_DATE,
+                 frac_of_stocks=1., minimum_volume=1e6,
+                 stock_data_dir_path: str = 'data/2019_2010_stock_data', dir_for_samples='data/cnn_samples/regular',
+                 nb_of_stocks_by_file=50, nb_files_to_read: int = 34,
                  ):
-
+        """
+        :param encoding_method: including GADF, GASF, MTF
+        :param window_len: length of moving window
+        :param image_size: size of image
+        :param retrain_freq: frequency of retrain
+        :param start_date: start date to consider for the stock data
+        :param end_date: last date to consider for the stock data
+        :param frac_of_stocks: fraction of data to utlize which ranges from start_date to end_date
+        :param minimum_volume: minimum average daily volume for small stock filtering
+        :param stock_data_dir_path: path to fetch stock data
+        :param dir_for_samples: path to store transformed images
+        :param nb_of_stocks_by_file: number of files to dump
+        :param nb_files_to_read: number of files to read
+        """
         self._window_len = window_len
         self._image_size = image_size
         self._retrain_freq = retrain_freq
         self._encoding_method = encoding_method
-        self._kwargs_target_methods = kwargs_target_methods or {}
 
         self._features = ['date', 'RET', 'ASKHI', 'BIDLO', 'VOL', 'sprtrn']
         self._min_volume = minimum_volume
@@ -77,9 +89,10 @@ class DataHandler:
         self.log('Data finalized in handler.df_data, number of stocks {}'.format(len(self._stocks_list)))
         self.df_data = self._get_data_between(df_data, self._start_date, self._end_date, self._LOGGER_ENV)
 
+
     def build_and_dump_images_and_targets(self):
         """
-             * Builds images with the timeseries
+             * Builds images with the time series
              * Builds labels using returns thresholds and volatility
              * Pickles dataframes on disk with keys/values :
                 - date as index
@@ -108,15 +121,23 @@ class DataHandler:
             # Dumping the pickle dataframe
             dump_pickle(df_res, os.path.join(self._directory_for_samples, btch_name), logger_env=self._LOGGER_ENV)
 
+
     @staticmethod
     def _build_close_returns(df, window_len=64, retrain_freq=5, up_return=0.0125, down_return=-0.0125,
                              buy_on_last_date=True):
+        """
+        :param up_return: threshold for long strategy
+        :param down_return: threshold for short strategy
+        :param buy_on_last_date: whether to buy on last date
+        :return: strategy target list, backtesting dataframe, price return list, date list
+        """
         n_sample = len(df)
         targets, prc_list, dates_list = [], [], []
 
-        _long = [1, 0, 0]
-        _hold = [0, 1, 0]
-        _short = [0, 0, 1]
+        # Strategy of long / hold / short
+        # Hold stands for a state that model can't make decision between long and short
+        _long, _hold, _short = [1, 0, 0], [0, 1, 0], [0, 0, 1]
+
         rebalance_indexes = []
         df_rolling_ret = np.exp(np.log(df.RET).rolling(window=retrain_freq).sum())  # product of returns
         # print(df_rolling_ret)
@@ -144,6 +165,7 @@ class DataHandler:
 
         return np.asarray(targets), df_for_backtest, prc_list, dates_list
 
+
     @staticmethod
     def _build_images_one_stock(df_one_permno, window_len, retrain_freq, encoding_method, image_size,
                                 use_smoothed_data=False):
@@ -153,6 +175,7 @@ class DataHandler:
         for i in range(window_len, n_days, retrain_freq):
             window_data = df_one_permno.T.iloc[:, i - window_len:i]
 
+            # Use GADF algorithm to transform data
             if encoding_method == 'GADF':
                 try:
                     from pyts.image import GADF
@@ -162,6 +185,7 @@ class DataHandler:
                     gadf = GramianAngularField(image_size, method='difference')
                 samples_list.append(gadf.fit_transform(window_data).T)
 
+            # Use GASF algorithm to transform data
             elif encoding_method == 'GASF':
                 try:
                     from pyts.image import GASF
@@ -170,6 +194,8 @@ class DataHandler:
                     from pyts.image import GramianAngularField
                     gasf = GramianAngularField(image_size, method='summation')
                 samples_list.append(gasf.fit_transform(window_data).T)
+
+            # Use MTF algorithm to transform data
             elif encoding_method == 'MTF':
                 try:
                     from pyts.image import MTF
@@ -182,6 +208,7 @@ class DataHandler:
                 raise BaseException('Method must be either GADF, GASF or MTF not {}'.format(encoding_method))
         samples_list = np.asarray(samples_list)
         return samples_list
+
 
     def _build_images_one_batch(self, df_batch_data, batch_name):
         self.log('Building Targets and Images for batch {}'.format(batch_name), )
@@ -200,8 +227,7 @@ class DataHandler:
 
             labels_array, df_for_backtest, prc_list, dates_list = self._build_close_returns(df_one_permno,
                                                                                             self._window_len,
-                                                                                            self._retrain_freq,
-                                                                                            **self._kwargs_target_methods)
+                                                                                            self._retrain_freq,)
 
             # building dataframe
             df_res_one_permno = pd.DataFrame(columns=columns_df_res)
@@ -225,7 +251,7 @@ class DataHandler:
         :param df_data:  pd.dataframe
          - Columns: ['date', 'TICKER', 'COMNAM', 'BIDLO', 'ASKHI', 'PRC', 'VOL', 'RET','SHROUT', 'sprtrn']
          - Index PERMNO
-        :return:
+        :return: filtered dataframe
         """
         df_filter = df_data.reset_index()[['PERMNO', 'VOL']]
         df_filter = df_filter.groupby('PERMNO').mean().sort_values('VOL', ascending=False)
@@ -237,7 +263,8 @@ class DataHandler:
 
     def __rectify_prices(self, df_data):
         """
-        In our database prices are often given negative when the MID is not really accurate we need to use positive prices
+        In our database prices are often given negative as a symbol when the MID is not really accurate
+        we need to rectify prices to positive values
         :param df_data:  pd.dataframe
          - Columns: ['date', 'TICKER', 'COMNAM', 'BIDLO', 'ASKHI', 'PRC', 'VOL', 'RET','SHROUT', 'sprtrn']
          - Index PERMNO
@@ -296,9 +323,6 @@ class DataHandler:
     def _load_stock_data(file_names: list = DEFAULT_FILES_NAMES, data_dir_path: str = 'data',
                          logger_env: str = 'Pickling'):
         """
-        :param file_names:
-        :param data_dir_path:
-        :param logger_env:
         :return: dataframe with all data: Example:
 
                 PERMNO(which is index)     date TICKER         COMNAM      DIVAMT  NSDINX   BIDLO  \
@@ -351,9 +375,11 @@ class DataHandler:
         df_res = df_res.reset_index(level=0, drop=False)
         return df_res
 
+
     def show_multichannels_images(self):
         """
-        Plots a multi dimensional timeseries encoded as n_dim images for one stock and the time window specified for the handler object
+        Plots a multi dimensional timeseries encoded as n_dim images for one stock
+        and the time window specified for the handler object
         """
         assert len(self._stocks_list) > 0, 'There is less than one permno available'
         permno = self._stocks_list[0]
@@ -365,12 +391,12 @@ class DataHandler:
         display(Markdown(msg))
         self._show_images(df_window_data)
 
+
     def _show_images(self, df_window_data):
         """
         Plots a multi dimensional timeseries encoded as an image
         :param df_window_data: timeseries we want to encode as an image
         """
-
         data = df_window_data.reset_index().set_index('date').drop('PERMNO', axis=1).T
         channels = list(data.index)
         if self._encoding_method == 'GADF':

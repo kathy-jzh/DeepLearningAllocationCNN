@@ -126,41 +126,22 @@ class Net:
         """
         with tf.variable_scope(name):
             # 1x1 pathway
-            # x1 = tf.nn.conv2d(inputs, filter=hyperparams["1x1_conv_kernel"], strides=[1, 1, 1, 1], padding='SAME',
-            #                   name="1x1_conv")
-            # x1 = Net.add_bias(x1)
-            # x1 = tf.nn.tanh(x1)
             x1 = Net.conv2d(layer_name='1x1_conv', inputs=inputs, kernel_shape=hyperparams["1x1_conv_kernel"],
                             strides=1, activation_func=tf.nn.tanh, padding='SAME')
 
             # 1x1 to 3x3 pathway
-            # x2 = tf.nn.conv2d(inputs, filter=hyperparams["3x3_conv_kernel1"], strides=[1, 1, 1, 1], padding='SAME',
-            #                   name="3x3_conv1")
-            # x2 = tf.nn.conv2d(x2, filter=hyperparams["3x3_conv_kernel2"], strides=[1, 1, 1, 1], padding='SAME',
-            #                   name="3x3_conv2")
-            # x2 = Net.add_bias(x2)
-            # x2 = tf.nn.tanh(x2)
             x2 = Net.conv2d(layer_name='3x3_conv1', inputs=inputs, kernel_shape=hyperparams["3x3_conv_kernel2"],
                             strides=1, activation_func=tf.nn.tanh, padding='SAME',
                             kernel_shape_pre=hyperparams["3x3_conv_kernel1"])
 
             # 1x1 to 5x5 pathway
-            # x3 = tf.nn.conv2d(inputs, filter=hyperparams["5x5_conv_kernel1"], strides=[1, 1, 1, 1], padding='SAME',
-            #                   name="5x5_conv1")
-            # x3 = tf.nn.conv2d(x3, filter=hyperparams["5x5_conv_kernel2"], strides=[1, 1, 1, 1], padding='SAME',
-            #                   name="5x5_conv2")
-            # x3 = Net.add_bias(x3)
-            # x3 = tf.nn.tanh(x3)
             x3 = Net.conv2d(layer_name='5x5_conv1', inputs=inputs, kernel_shape=hyperparams["5x5_conv_kernel2"],
                             strides=1, activation_func=tf.nn.tanh, padding='SAME',
                             kernel_shape_pre=hyperparams["5x5_conv_kernel1"])
 
             # 3x3 to 1x1 pathway
             x4 = tf.nn.max_pool(inputs, ksize=[1, 3, 3, 1], strides=[1, 1, 1, 1], padding='SAME', name="pooling1")
-            # x4 = tf.nn.conv2d(x4, filter=hyperparams['pooling1_conv_kernel'], strides=[1, 1, 1, 1], padding='SAME',
-            #                   name="pooling1_conv")
-            # x4 = Net.add_bias(x4)
-            # x4 = tf.nn.tanh(x4)
+
             x4 = Net.conv2d(layer_name='pooling1_conv', inputs=inputs, kernel_shape=hyperparams["pooling1_conv_kernel"],
                             strides=1, activation_func=tf.nn.tanh, padding='SAME')
 
@@ -208,17 +189,15 @@ class Net:
                 inputs = tf.nn.conv2d(inputs, filter=w, strides=[1, strides, strides, 1], padding=padding, name='conv')
                 inputs = tf.nn.bias_add(inputs, b, name='bias_add')
                 outputs = activation_func(inputs,
-                                          name='activation_func')  # TODO see if we keep this activation function ?
+                                          name='activation_func')
                 return outputs
 
     @staticmethod
     def __cost_sensitive_loss_func(y_true, y_pred, expected_penalty):
         """
         Cost sensitive loss function with cross-entropy
-        :param y_true:
-        :param y_pred:
-        :param expected_penalty:
-        :return:
+        :param expected_penalty: penalty on confusion matrix
+        :return: adjusted loss function
         """
         y_pred = tf.clip_by_value \
             ((y_pred * expected_penalty) / tf.reduce_sum(y_pred * expected_penalty, axis=-1, keepdims=True), 1e-7,
@@ -226,14 +205,9 @@ class Net:
         loss = tf.keras.backend.categorical_crossentropy(y_true, y_pred)
         return tf.reduce_mean(loss)
 
-        #    def vae_loss(X, X_output, mu, log_sigma2):
-        #        reconstruction_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=X, predictions=X_output))
-        #        distribution_loss = -0.5*tf.reduce_mean(-tf.exp(log_sigma2) - tf.square(mu) + log_sigma2, axis=-1)
-        #        return tf.reduce_mean(reconstruction_loss+distribution_loss)
 
     def _xentropy_loss_func(self, cost_sensitive_loss=False, expected_penalty=None, **kwargs):
         """
-
         :param output: if cost_sensitive_loss is False output should be the pre_thresholded_output
         :param y_batch: y_batch
         :param expected_penalty: expected penalty of misclassifying i-th class.
@@ -249,14 +223,14 @@ class Net:
                     tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_batch, logits=self._pre_thresholded_output))
             self.loss = xentropy_loss
 
-    def _optimize(self):
 
+    def _optimize(self):
         try:
             learning_rate = self._hyperparams['learning_rate']
         except KeyError:
             log('learning_rate was not specified in hyperparams using default:{}'.format(DEFAULT_LEARNING_RATE),
                 loglevel='warning',environment=DEFAULT_LOG_ENV)
-            learning_rate = DEFAULT_LEARNING_RATE  # todo define default rate in config
+            learning_rate = DEFAULT_LEARNING_RATE
 
         try:
             tf_optimizer = self._hyperparams['tf_optimizer']
@@ -289,6 +263,7 @@ class Net:
         if verbose:
             log('Model Saved', environment=DEFAULT_LOG_ENV)
 
+
     def _accuracy_func(self):
         with tf.name_scope('accuracy'):
             accuracy = tf.reduce_mean(
@@ -296,8 +271,10 @@ class Net:
             tf.summary.scalar("validation_error", (1.0 - accuracy))
             self.accuracy = accuracy
 
+
     def restore_importants_ops(self,sess,model_ckpt_path_to_restore):
         raise NotImplementedError('Should be implemented in the child class since this is model dependent')
+
 
     def build_operations(self,**kwargs):
         """
@@ -323,8 +300,6 @@ class Net:
         max_save_to_keep = kwargs.get('max_save_to_keep', 4)
         self.saver =  tf.train.Saver(max_to_keep=kwargs.get('max_save_to_keep',4))
         log('Saver will keep the last {} latest models'.format(max_save_to_keep),DEFAULT_LOG_ENV)
-
-
 
     def get_dropout(self):
         try:

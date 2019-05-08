@@ -1,3 +1,7 @@
+"""
+Hyperparameter storage
+"""
+
 ###################### General
 
 DEFAULT_LEARNING_RATE = 0.001
@@ -18,15 +22,17 @@ AlexNet_hyperparams = {
 
     # 2nd Conv Layer block
     "conv2_conv_kernel": (3, 3, 10, 10),
+
     # 3rd Conv Layer block
     "conv3_conv_kernel": (2, 2, 10, 8),
 
-    # 3rd Conv Layer block
+    # 4rd Conv Layer block
     "conv4_conv_kernel": (2, 2, 8, 4),
 }
 
-##################### For GooGLeNet
+##################### For GoogLeNet
 
+# hyperparameter list for 1st inception module
 inception1_hyperparam = {
     # 1x1 pathway
     "1x1_conv_kernel": (1, 1, 8, 6),

@@ -5,17 +5,15 @@ import os
 
 from utils import load_pickle, log, plot_highstock_with_table, integer_to_timestamp_date_index
 
-
 class Backtester:
     """
-    Backtester object that:
+    Backtester aims to:
         - gets data from pickles files
         - restores a trained network from a given checkpoint
         - make predictions
         - create 'signals' i.e what to buy at each rebalancing date for a list of strategies
         - runs the backtests for each strategies given market returns and signals
-        - plots the results
-
+        - plots the backtesting results
 
     See main function Backtester.run_backtest()
     """
@@ -67,10 +65,9 @@ class Backtester:
         self.df_strats = self._format_df_strats(df_backt_results)
 
 
-
-
     def _run_strategies(self):
-        """ Uses the dataframe with all data: Example below, to make a backtest
+        """ Uses the dataframe with all data to make a backtesting
+        : Example below
                PERMNO     RET     long      hold     short
         date
         20181030  83387.0   1.03  0.149458  0.353090  0.497452
@@ -138,18 +135,19 @@ class Backtester:
         # empty dataframe that will be used to store results
         df_permnos_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
 
-        # make weights proportionnal to the signal we consider
+        # make weights proportional to the signal we consider
         def get_proportionnal_weights(data_sorted, list_permnos_to_buy):
             weight_permnos = data_sorted.loc[list_permnos_to_buy].values.T[0]
             weight_permnos = weight_permnos / weight_permnos.sum()
             return weight_permnos
+
+        # calculate proportional weights and stocks to buy in each bin
         def perform_bin_strategy(data_sorted):
             bin = int(strat.split('_')[0])  # format must be '4_bins_...' for the 4th bin
             n_stocks = len(data_sorted.index)
-            list_permnos_to_buy = list(data_sorted.index[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)])
+            list_permnos_to_buy = list(data_sorted.index)[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)]
             weight_permnos = get_proportionnal_weights(data_sorted, list_permnos_to_buy)
             return list_permnos_to_buy,weight_permnos
-
 
         for date in df_data.index:
             data_sorted_long = data_sorted_long_all_dates.loc[date].set_index('PERMNO')[['long']]
