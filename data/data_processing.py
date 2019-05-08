@@ -21,14 +21,12 @@ class DataHandler:
                  dir_for_samples='data/cnn_samples/regular',
                  nb_of_stocks_by_file=50,
                  nb_files_to_read: int = 34,
-                 kwargs_target_methods=None
                  ):
 
         self._window_len = window_len
         self._image_size = image_size
         self._retrain_freq = retrain_freq
         self._encoding_method = encoding_method
-        self._kwargs_target_methods = kwargs_target_methods or {}
 
         self._features = ['date', 'RET', 'ASKHI', 'BIDLO', 'VOL', 'sprtrn']
         self._min_volume = minimum_volume
@@ -199,8 +197,7 @@ class DataHandler:
 
             labels_array, df_for_backtest, prc_list, dates_list = self._build_close_returns(df_one_permno,
                                                                                             self._window_len,
-                                                                                            self._retrain_freq,
-                                                                                            **self._kwargs_target_methods)
+                                                                                            self._retrain_freq)
 
             # building dataframe
             df_res_one_permno = pd.DataFrame(columns=columns_df_res)
