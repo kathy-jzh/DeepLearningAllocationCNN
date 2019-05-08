@@ -1,6 +1,6 @@
 import tensorflow as tf
 from utils import log
-from config.hyperparams import DEFAULT_LEARNING_RATE, DEFAULT_TF_OPTIMIZER,DEFAULT_LOG_ENV
+from config.config import DEFAULT_LEARNING_RATE, DEFAULT_TF_OPTIMIZER,DEFAULT_LOG_ENV
 
 
 class Net:

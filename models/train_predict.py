@@ -7,7 +7,7 @@ from sklearn.metrics import confusion_matrix
 from models.CNNModels import Net
 from utils import log
 from models.utils import UtilsTraining
-from config.hyperparams import DEFAULT_LOG_ENV, NB_OF_EPOCHS_FOR_BAYESIAN
+from config.config import DEFAULT_LOG_ENV, NB_OF_EPOCHS_FOR_BAYESIAN
 
 
 def train_predict(X, Y, valX, valY,
@@ -115,9 +115,9 @@ def _run_epochs(restore,sess,net,X,Y,valX,valY,sample_size,epochs,nb_of_batches_
         epoch_loss, epoch_acc = cc / float(sample_size), aa / float(sample_size)
         training_loss.append(epoch_loss)
 
-        # run validation in batches
+        # run validation in batches to avoid memory problems
         size_1_image = np.prod(valX[0].shape)
-        limit_size = batch_size * 42 * 42 * 5
+        limit_size = (10*batch_size) * 42 * 42 * 5
         size_batch = int(limit_size / size_1_image) + 1
         output_val,epoch_val_loss= np.zeros((0, 3)), 0.
         nb_batches = round(len(X) / size_batch)
