@@ -143,6 +143,9 @@ class Backtester:
                 weight_permnos = weight_permnos / weight_permnos.sum()
             return weight_permnos
 
+        # TODO: put threshold on pure long/short stratgy, so that the condition of 10 stocks a day is not a must but a cap
+        # This would help to remove the similar trend betwen our bins and the index
+
         # calculate proportional weights and stocks to buy in each bin
         def perform_bin_strategy(data_sorted):
             bin = int(strat.split('_')[0])  # format must be '4_bins_...' for the 4th bin
