@@ -22,6 +22,7 @@ class DataHandler:
                  window_len=42,
                  image_size=42,
                  retrain_freq=5,
+                 threshold_ret = (-0.014,0.014),
                  start_date: int = DEFAULT_START_DATE,
                  end_date: int = DEFAULT_END_DATE,
                  frac_of_stocks=1.,
@@ -48,6 +49,7 @@ class DataHandler:
         self._window_len = window_len
         self._image_size = image_size
         self._retrain_freq = retrain_freq
+        self._threshold_ret = threshold_ret
         self._encoding_method = encoding_method
 
         self._features = ['date', 'RET', 'ASKHI', 'BIDLO', 'VOL', 'sprtrn']
@@ -121,7 +123,6 @@ class DataHandler:
             btch_name = 'image_data_{}'.format(batch + 1)
             btch_stocks = self._stocks_list[batch * self._nb_of_stocks_by_file:(batch + 1) * self._nb_of_stocks_by_file]
             df_batch_data = self._extract_data_for_stocks(df_data_multi_index, btch_stocks)
-            print(df_batch_data.head(3))
             # Build Images and targets
             df_res = self._build_images_one_batch(df_batch_data, btch_name)
             # Sort by dates
@@ -175,8 +176,18 @@ class DataHandler:
 
 
     @staticmethod
-    def _build_images_one_stock(df_one_permno, window_len, retrain_freq, encoding_method, image_size,
-                                use_smoothed_data=False):
+    def _build_images_one_stock(df_one_permno, window_len, retrain_freq, encoding_method, image_size):
+        """
+        Encodes images as timeseries for one stock
+        :param df_one_permno: dataframe of the timeseries of all data for one particular stock
+        :param window_len: number of observations to consider (42 for 2 months)
+        :param retrain_freq: lag to consider between making two samples
+        :param encoding_method: method to encode the images
+        :param image_size: final size of the image (using window_len*window_len will avoid any averaging)
+        :return: np.ndarray of the samples of shape (N,window_len,window_len,M) where:
+                - M is the number of features
+                - N is the number of final samples ~ len(df_one_permno)/retrain_freq
+        """
 
         n_days = df_one_permno.T.shape[-1]
         samples_list, dates_list, prc_list = [], [], []
@@ -219,6 +230,11 @@ class DataHandler:
 
 
     def _build_images_one_batch(self, df_batch_data, batch_name):
+        """
+        :param df_batch_data: dataframe of the timeseries of all data for a batch of stocks
+        :param batch_name: name of the batch
+        :return: pd.DataFrame with columns ['sample', 'date', 'RET', 'close']
+        """
         self.log('Building Targets and Images for batch {}'.format(batch_name), )
 
         df_batch_data = df_batch_data.reset_index(drop=False).set_index(['PERMNO', 'date'])
@@ -235,7 +251,8 @@ class DataHandler:
 
             labels_array, df_for_backtest, prc_list, dates_list = self._build_close_returns(df_one_permno,
                                                                                             self._window_len,
-                                                                                            self._retrain_freq,)
+                                                                                            self._retrain_freq,up_return=self._threshold_ret[1],
+                                                                                            down_return=self._threshold_ret[0])
 
             # building dataframe
             df_res_one_permno = pd.DataFrame(columns=columns_df_res)
@@ -243,7 +260,7 @@ class DataHandler:
             for k, date in enumerate(dates_list):
                 data = [samples_list[k], date, prc_list[k], labels_array[k]]
                 row_df = pd.DataFrame(columns=columns_df_res, data=[data])
-                df_res_one_permno = pd.concat([df_res_one_permno, row_df])
+                df_res_one_permno = pd.concat([df_res_one_permno, row_df],sort=True)
             df_res_one_permno['PERMNO'] = permno
             df_res = pd.concat([df_res, df_res_one_permno])
 
@@ -450,12 +467,14 @@ class DataHandler:
 
 
 def get_training_data_from_path(samples_path='data/cnn_samples/regular',
-                                targets_type='VWAP_targets',
+                                targets_type='close',
                                 train_val_size=2 / 3.,
                                 train_size=0.75,
                                 logger_env='Training',
                                 ):
     """
+    Unpickles data and formats it for training
+
     :param samples_path: path for the folder with the data we need: only the files we need need to be in this folder
     :param targets_type: str: the targets to consider for this training
     :param train_val_size: training/(training+validation)
@@ -523,23 +542,3 @@ def get_training_data_from_path(samples_path='data/cnn_samples/regular',
     return X_train, X_val, X_test, Y_train, Y_val, Y_test
 
 
-def generate_dummy_data(batch_size):
-    size_third = int(batch_size / 3.)
-    rest = batch_size - 3 * size_third
-
-    data_x_label_1 = np.random.uniform(-1, 0.9, (size_third, 16, 16, 4))
-    data_x_label_2 = np.random.uniform(-0.95, 0.95, (size_third, 16, 16, 4))
-    data_x_label_3 = np.random.uniform(-0.9, 1, (size_third + rest, 16, 16, 4))
-
-    data_x_label_1 = np.asarray(data_x_label_1, np.float32)
-    data_x_label_2 = np.asarray(data_x_label_2, np.float32)
-    data_x_label_3 = np.asarray(data_x_label_3, np.float32)
-
-    data_y_label_1 = np.asarray([[1, 0, 0] for i in range(size_third)], np.float32)
-    data_y_label_2 = np.asarray([[0, 1, 0] for i in range(size_third)], np.float32)
-    data_y_label_3 = np.asarray([[0, 0, 1] for i in range(size_third + rest)], np.float32)
-
-    data_x = np.concatenate((data_x_label_1, data_x_label_2, data_x_label_3))
-    data_y = np.concatenate((data_y_label_1, data_y_label_2, data_y_label_3))
-
-    return data_x, data_y

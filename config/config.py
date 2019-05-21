@@ -95,4 +95,7 @@ GoogleNet_hyperparams = {'first_block': first_block_gglnet_hyperparam,
                          'inception_2': inception2_hyperparam,
                          'inception_3': inception3_hyperparam,
                          'dropout': 0.15,
+                         'learning_rate':0.003,
                          }
+
+ResNet_hyperparams = {'learning_rate':0.003,'tf_optimizer':'rmsprop','dropout':0.1}

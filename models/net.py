@@ -1,17 +1,17 @@
 import tensorflow as tf
+import os
 from utils import log
-from config.config import DEFAULT_LEARNING_RATE, DEFAULT_TF_OPTIMIZER,DEFAULT_LOG_ENV
+from config.config import DEFAULT_LEARNING_RATE, DEFAULT_TF_OPTIMIZER, DEFAULT_LOG_ENV
 
 
 class Net:
     """
-    a mother class for all types of nets
+    a mother class for all types of Neural Networks
     """
 
-    def __init__(self, shape_x: iter, shape_y: iter, hyperparams: dict,name:str):
+    def __init__(self, shape_x: iter, shape_y: iter, hyperparams: dict, name: str):
         self._hyperparams = hyperparams
         self.name = name
-
 
         self._shape_x = shape_x
         self._shape_y = shape_y
@@ -33,10 +33,8 @@ class Net:
 
         self.saver = None
 
-
     def _inference(self, **kwargs):
         """
-
         instanciate: pre_thresholded_output, output
         """
         raise NotImplementedError('Should be implemented in the child class')
@@ -45,16 +43,9 @@ class Net:
     def dense_layer(inputs, units, name=None):
         """
         A wrapped up dense layer function (defines dense layer operation)
-        :param inputs:
-        :param units:
-        :param name:
-        :return:
         """
         with tf.variable_scope(name):
             inputs_shape = tf.Tensor.get_shape(inputs).as_list()[-1]
-
-            # weight_matrix = tf.Variable(tf.truncated_normal([inputs_shape, units], stddev=0.01), name=name['weight'])
-            # bias = tf.Variable(tf.constant(1.0, shape=[units]), name=name['bias'])
 
             w = tf.get_variable(name='weight',
                                 trainable=True,
@@ -69,98 +60,23 @@ class Net:
             outputs = tf.matmul(inputs, w)
             outputs = tf.nn.bias_add(outputs, b)
             return outputs
+
     @staticmethod
     def batch_normalization(inputs, training):
         """Performs a batch normalization using a standard set of parameters."""
-        # We set fused=True for a significant performance boost. See
-        # https://www.tensorflow.org/performance/performance_guide#common_fused_ops
         return tf.compat.v1.layers.batch_normalization(
             inputs=inputs, axis=-1,
             momentum=0.99, epsilon=1e-5, center=True,
             scale=True, training=training, fused=True)
 
-    @staticmethod
-    def batch_normalization_v0(x, phase_train, decay=0.99):
-        """
-        input:
-            x: input data to be batch normalized
-            n_out: the size of the output tensor
-            phase_train: a boolean tensor. True: update mean and var. False: not update
-        """
-        n_out = x.get_shape()[-1]
-        # offset: An offset Tensor, often denoted beta in equations, or None. If present, will be added to the normalized tensor.
-        # scale: A scale Tensor, often denoted gamma in equations, or None. If present, the scale is applied to the normalized tensor.
-        beta_init = tf.constant_initializer(value=0.0, dtype=tf.float32)
-        gamma_init = tf.constant_initializer(value=1.0, dtype=tf.float32)
 
-        beta = tf.get_variable("beta", [n_out], initializer=beta_init)
-        gamma = tf.get_variable("gamma", [n_out], initializer=gamma_init)
-
-        [batch_mean, batch_var] = tf.nn.moments(x, [0, 1, 2], name='moments')
-        # use an exponential moving average to estimate the population mean and variance during training
-        # set decay rate to be larger if you have larger size of data
-        ema = tf.train.ExponentialMovingAverage(decay=decay)
-        ema_apply_op = ema.apply([batch_mean, batch_var])
-        [ema_mean, ema_var] = ema.average(batch_mean), ema.average(batch_var)
-
-        def mean_var_with_update():
-            # in training episode, train_mean and train_var have to be updated first by tf.control_dependencies, then execute the return line
-            # https://www.tensorflow.org/api_docs/python/tf/Graph#control_dependencies
-            with tf.control_dependencies([ema_apply_op]):
-                return tf.identity(batch_mean), tf.identity(batch_var)
-
-        [mean, var] = tf.cond(phase_train, mean_var_with_update, lambda: (ema_mean, ema_var))
-        normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 0.001)
-
-        return normed
-
-
-    @staticmethod
-    def inception_mod(inputs, hyperparams: dict, name: str):
-        """
-        Well-tuned inception module used in the subsequent GoogLeNet-like CNN
-        :param inputs:
-        :param hyperparams:
-        :param name:
-        :return:
-        """
-        with tf.variable_scope(name):
-            # 1x1 pathway
-            x1 = Net.conv2d(layer_name='1x1_conv', inputs=inputs, kernel_shape=hyperparams["1x1_conv_kernel"],
-                            strides=1, activation_func=tf.nn.tanh, padding='SAME')
-
-            # 1x1 to 3x3 pathway
-            x2 = Net.conv2d(layer_name='3x3_conv1', inputs=inputs, kernel_shape=hyperparams["3x3_conv_kernel2"],
-                            strides=1, activation_func=tf.nn.tanh, padding='SAME',
-                            kernel_shape_pre=hyperparams["3x3_conv_kernel1"])
-
-            # 1x1 to 5x5 pathway
-            x3 = Net.conv2d(layer_name='5x5_conv1', inputs=inputs, kernel_shape=hyperparams["5x5_conv_kernel2"],
-                            strides=1, activation_func=tf.nn.tanh, padding='SAME',
-                            kernel_shape_pre=hyperparams["5x5_conv_kernel1"])
-
-            # 3x3 to 1x1 pathway
-            x4 = tf.nn.max_pool(inputs, ksize=[1, 3, 3, 1], strides=[1, 1, 1, 1], padding='SAME', name="pooling1")
-
-            x4 = Net.conv2d(layer_name='pooling1_conv', inputs=inputs, kernel_shape=hyperparams["pooling1_conv_kernel"],
-                            strides=1, activation_func=tf.nn.tanh, padding='SAME')
-
-            x = tf.concat([x1, x2, x3, x4], axis=3)  # Concat in the 4th dim to stack
-            outputs = tf.tanh(x)
-
-            return outputs
 
     @staticmethod
     def conv2d(layer_name: str, inputs, kernel_shape: iter, strides=1, padding='SAME',
                activation_func=tf.nn.tanh, kernel_shape_pre=None):
         """
-        :param layer_name: for the scope
-        :param inputs: input tensor (first one would be .x)
-        :param out_channels: nb of out channels
-        :param kernel_size: size of the mask
-        :param strides: strides for the convolution
-        :param padding: for the borders
-        :return: output tensor of the convolutionnal layer
+        Performs 2D convolution, enables a 'pre-convolution,
+         the one that is used within the inception module for GoogLeNet
         """
         # in_channels = inputs.get_shape()[-1]
 
@@ -205,7 +121,6 @@ class Net:
         loss = tf.keras.backend.categorical_crossentropy(y_true, y_pred)
         return tf.reduce_mean(loss)
 
-
     def _xentropy_loss_func(self, cost_sensitive_loss=False, expected_penalty=None, **kwargs):
         """
         :param output: if cost_sensitive_loss is False output should be the pre_thresholded_output
@@ -223,46 +138,55 @@ class Net:
                     tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_batch, logits=self._pre_thresholded_output))
             self.loss = xentropy_loss
 
-
     def _optimize(self):
+        """
+        Instantiates an tensorflow minimize operation
+        """
         try:
             learning_rate = self._hyperparams['learning_rate']
         except KeyError:
             log('learning_rate was not specified in hyperparams using default:{}'.format(DEFAULT_LEARNING_RATE),
-                loglevel='warning',environment=DEFAULT_LOG_ENV)
+                loglevel='warning', environment=DEFAULT_LOG_ENV)
             learning_rate = DEFAULT_LEARNING_RATE
 
         try:
             tf_optimizer = self._hyperparams['tf_optimizer']
         except KeyError:
             log('tf_optimizer was not specisefied in hyperparams, using default:{}'.format(DEFAULT_TF_OPTIMIZER),
-                loglevel='warning',environment=DEFAULT_LOG_ENV)
+                loglevel='warning', environment=DEFAULT_LOG_ENV)
             tf_optimizer = DEFAULT_TF_OPTIMIZER
         if tf_optimizer.lower() == 'adam':
             tf_optimizer = tf.train.AdamOptimizer
         elif tf_optimizer.lower() == 'sgd':
             tf_optimizer = tf.train.GradientDescentOptimizer
-        elif tf_optimizer.lower()=='rmsprop':
+        elif tf_optimizer.lower() == 'rmsprop':
             tf_optimizer = tf.train.RMSPropOptimizer
         else:
-            raise NotImplementedError('You need to modify the code to use another optimizer so far we have sgd, rmsprop and adam')
+            raise NotImplementedError(
+                'You need to modify the code to use another optimizer so far we have sgd, rmsprop and adam')
 
         tf.summary.scalar('training_loss', self.loss)
-        self.optimizer = tf_optimizer(learning_rate=learning_rate).minimize(self.loss, global_step=self.global_step,name='minimize')
-        # todo find how the learning rate changes result
+        self.optimizer = tf_optimizer(learning_rate=learning_rate).minimize(self.loss, global_step=self.global_step,
+                                                                            name='minimize')
 
-
-    def save(self, sess:tf.Session,model_ckpt_path:str,verbose=False,epoch=None,write_meta_graph=True):
+    def save(self, sess: tf.Session, model_ckpt_path: str, verbose=False, epoch=None, write_meta_graph=True):
+        """
+        Saves the model on disk
+        :param sess: current session
+        :param model_ckpt_path: path for the checkpoints' files on disk
+        :param verbose: for full details
+        :param epoch: number of the epoch for printing
+        :param write_meta_graph: True to rewrite a .meta file for the network at each save
+        """
 
         if verbose:
             msg = 'Saving Model to {}'.format(model_ckpt_path)
-            msg+= ', global step = {}'.format(self.global_step.eval(session=sess))
-            msg = msg +' epoch: {}'.format(epoch) if epoch else msg
-            log(msg,environment=DEFAULT_LOG_ENV)
-        self.saver.save(sess, model_ckpt_path, self.global_step,write_meta_graph=write_meta_graph)
+            msg += ', global step = {}'.format(self.global_step.eval(session=sess))
+            msg = msg + ' epoch: {}'.format(epoch) if epoch else msg
+            log(msg, environment=DEFAULT_LOG_ENV)
+        self.saver.save(sess, model_ckpt_path, self.global_step, write_meta_graph=write_meta_graph)
         if verbose:
             log('Model Saved', environment=DEFAULT_LOG_ENV)
-
 
     def _accuracy_func(self):
         with tf.name_scope('accuracy'):
@@ -271,35 +195,34 @@ class Net:
             tf.summary.scalar("validation_error", (1.0 - accuracy))
             self.accuracy = accuracy
 
-
-    def restore_importants_ops(self,sess,model_ckpt_path_to_restore):
+    def restore_importants_ops(self, sess, model_ckpt_path_to_restore):
         raise NotImplementedError('Should be implemented in the child class since this is model dependent')
 
 
-    def build_operations(self,**kwargs):
+    def build_operations(self, **kwargs):
         """
-        Builds all operations that will be run within the session
+        Builds all operations that will be run within the session and instantiates them
+
         :param kwargs: union (as a dict) of all arguments necessary for the functions below
-        :return:
         """
         self.x = tf.placeholder(tf.float32, self._shape_x, name='x')
         # tf.add_to_collection('x',self.x)
         self.y = tf.placeholder(tf.float32, self._shape_y, name='y')
-        self.phase_train = tf.placeholder(tf.bool,name='phase_train')
-        self.dropout = tf.placeholder(tf.float32,name='dropout')
+        self.phase_train = tf.placeholder(tf.bool, name='phase_train')
+        self.dropout = tf.placeholder(tf.float32, name='dropout')
 
         self._inference(**kwargs)  # example: dropout
         self._xentropy_loss_func(**kwargs)  # example: expected_penalty
 
-        self.global_step = tf.Variable(0, trainable=False,name='global_step')
+        self.global_step = tf.Variable(0, trainable=False, name='global_step')
         self._optimize()  # todo see if we can do in a different way for the optimizer
         self._accuracy_func()
         self.summary_op = tf.summary.merge_all()
         self.init = tf.global_variables_initializer()
 
         max_save_to_keep = kwargs.get('max_save_to_keep', 4)
-        self.saver =  tf.train.Saver(max_to_keep=kwargs.get('max_save_to_keep',4))
-        log('Saver will keep the last {} latest models'.format(max_save_to_keep),DEFAULT_LOG_ENV)
+        self.saver = tf.train.Saver(max_to_keep=kwargs.get('max_save_to_keep', 4))
+        log('Saver will keep the last {} latest models'.format(max_save_to_keep), DEFAULT_LOG_ENV)
 
     def get_dropout(self):
         try:

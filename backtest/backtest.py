@@ -103,7 +103,7 @@ class Backtester:
         return df_results
 
 
-    def __create_signals(self, df_data, strategies=['10_max_long', '20_max_long'], bins=None):
+    def __create_signals(self, df_data, strategies=['10_max_long', '20_max_long'], bins=None,equi_weighted = True):
         """
         Creates the list of stocks to buy in each strategy for each rebalacing date
 
@@ -135,10 +135,12 @@ class Backtester:
         # empty dataframe that will be used to store results
         df_permnos_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
 
-        # make weights proportional to the signal we consider
-        def get_proportionnal_weights(data_sorted, list_permnos_to_buy):
-            weight_permnos = data_sorted.loc[list_permnos_to_buy].values.T[0]
-            weight_permnos = weight_permnos / weight_permnos.sum()
+        def get_weights(data_sorted, list_permnos_to_buy):
+            if equi_weighted:
+                weight_permnos = np.ones(len(list_permnos_to_buy))/len(list_permnos_to_buy)
+            else:   # make weights proportional to the signal we consider
+                weight_permnos = data_sorted.loc[list_permnos_to_buy].values.T[0]
+                weight_permnos = weight_permnos / weight_permnos.sum()
             return weight_permnos
 
         # calculate proportional weights and stocks to buy in each bin
@@ -146,7 +148,7 @@ class Backtester:
             bin = int(strat.split('_')[0])  # format must be '4_bins_...' for the 4th bin
             n_stocks = len(data_sorted.index)
             list_permnos_to_buy = list(data_sorted.index)[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)]
-            weight_permnos = get_proportionnal_weights(data_sorted, list_permnos_to_buy)
+            weight_permnos = get_weights(data_sorted, list_permnos_to_buy)
             return list_permnos_to_buy,weight_permnos
 
         for date in df_data.index:
@@ -157,16 +159,16 @@ class Backtester:
             for strat in strategies:
                 if strat == '10_max_long':
                     list_permnos_to_buy = list(data_sorted_long.index[:10])
-                    weight_permnos = get_proportionnal_weights(data_sorted_long, list_permnos_to_buy)
+                    weight_permnos = get_weights(data_sorted_long, list_permnos_to_buy)
                 elif strat == '20_max_long':
                     list_permnos_to_buy = list(data_sorted_long.index[:20])
-                    weight_permnos = get_proportionnal_weights(data_sorted_long, list_permnos_to_buy)
+                    weight_permnos = get_weights(data_sorted_long, list_permnos_to_buy)
                 elif strat == '2_max_long':
                     list_permnos_to_buy = list(data_sorted_long.index[:2])
-                    weight_permnos = get_proportionnal_weights(data_sorted_long, list_permnos_to_buy)
+                    weight_permnos = get_weights(data_sorted_long, list_permnos_to_buy)
                 elif strat == 'threshold':
                     list_permnos_to_buy = list(df_data[df_data.long >= 0.75].index)
-                    weight_permnos = get_proportionnal_weights(data_sorted_long, list_permnos_to_buy)
+                    weight_permnos = get_weights(data_sorted_long, list_permnos_to_buy)
                 elif 'bins_long' in strat:
                     list_permnos_to_buy,weight_permnos = perform_bin_strategy(data_sorted_long)
                 elif 'bins_short' in strat:

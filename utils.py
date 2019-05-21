@@ -4,7 +4,24 @@ import os
 import pickle
 import ezhc as hc
 import pandas as pd
+import random
+import numpy as np
 
+
+def extract_minibatch(X, Y, batch_size, current_batch):
+    """
+    Enables to select a minibatch out of the whole training data
+    """
+
+    if (current_batch + 1) * batch_size > len(X):
+        x_b, y_b = X[current_batch * batch_size:], Y[current_batch * batch_size:]
+
+    else:
+        x_b, y_b = X[current_batch * batch_size:(current_batch + 1) * batch_size], Y[current_batch * batch_size:(current_batch + 1) * batch_size]
+
+    if len(x_b)==0:
+        x_b,y_b = X[:batch_size],Y[:batch_size]
+    return np.asarray(x_b), np.asarray(y_b)
 
 def plot_highstock_with_table(df, title=''):
     g = hc.Highstock()
