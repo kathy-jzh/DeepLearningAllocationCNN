@@ -23,33 +23,6 @@ def extract_minibatch(X, Y, batch_size, current_batch):
         x_b,y_b = X[:batch_size],Y[:batch_size]
     return np.asarray(x_b), np.asarray(y_b)
 
-def plot_highstock_with_table(df, title=''):
-    g = hc.Highstock()
-
-    g.chart.width = 900
-    g.chart.height = 600
-    g.legend.enabled = True
-    g.legend.layout = 'horizontal'
-    g.legend.align = 'center'
-    g.legend.maxHeight = 100
-    g.tooltip.enabled = True
-    g.tooltip.valueDecimals = 2
-    g.exporting.enabled = True
-
-    g.chart.zoomType = 'xy'
-    g.title.text = title
-    g.subtitle.text = 'Subtitle ? '
-
-    g.plotOptions.series.compare = 'percent'
-
-    g.xAxis.gridLineWidth = 1.0
-    g.xAxis.gridLineDashStyle = 'Dot'
-    g.yAxis.gridLineWidth = 1.0
-    g.yAxis.gridLineDashStyle = 'Dot'
-
-    g.series = hc.build.series(df)
-
-    return g.plot_with_table_1(save=False, dated=True, version='latest')
 
 
 def integer_to_timestamp_date_index(df):
@@ -63,7 +36,6 @@ def integer_to_timestamp_date_index(df):
 def log(msg, environment='', loglevel='info', **kwargs):
     """"""
     if __is_in_ipython():
-        # '%(name)s | %(asctime)s | %(levelname)s:  %(message)s'
         formatter = kwargs.get('formatter', '%(asctime)s | %(levelname)s:  %(message)s')
         loglevel_limit = kwargs.get('loglevel_limit', None)
         logger = get_logger(environment, loglevel=loglevel_limit, formatter=formatter)

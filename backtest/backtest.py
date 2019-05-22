@@ -3,15 +3,16 @@ import numpy as np
 import tensorflow as tf
 import os
 
-from utils import load_pickle, log, plot_highstock_with_table, integer_to_timestamp_date_index
+from utils import load_pickle, log, integer_to_timestamp_date_index
+
 
 class Backtester:
     """
-    Backtester aims to:
+    Backtester:
         - gets data from pickles files
         - restores a trained network from a given checkpoint
-        - make predictions
-        - create 'signals' i.e what to buy at each rebalancing date for a list of strategies
+        - makes predictions
+        - creates 'signals' i.e what to buy at each rebalancing date for a list of strategies
         - runs the backtests for each strategies given market returns and signals
         - plots the backtesting results
 
@@ -19,7 +20,8 @@ class Backtester:
     """
 
     def __init__(self, path_data, path_model_to_restore, start_date=20150101, end_date=20200101,
-                 strategies=['10_max_long', '20_max_long', '2_max_long'], num_bins=None, network_name='CondensedGoogLeNet'):
+                 strategies=['10_max_long', '20_max_long', '2_max_long'], num_bins=None,
+                 network_name='CondensedGoogLeNet'):
         """
         :param path_data:str: path to the folder containing the pickles files with the images
         :param path_model_to_restore:str: path for the model checkpoint used to make the predictions
@@ -64,7 +66,6 @@ class Backtester:
 
         self.df_strats = self._format_df_strats(df_backt_results)
 
-
     def _run_strategies(self):
         """ Uses the dataframe with all data to make a backtesting
         : Example below
@@ -79,13 +80,11 @@ class Backtester:
                     20151008        1.00058        0.99515
 
         """
-        # TODO modify the function to support different strategies, make a column weights in df_permnos_to_buy
         df_data = self._df_all_data
         strategies = self._strategies
-        self._df_permnos_to_buy = self.__create_signals(df_data,strategies=self._strategies, bins=self._num_bins)
+        self._df_permnos_to_buy = self.__create_signals(df_data, strategies=self._strategies, bins=self._num_bins)
         # self._df_permnos_to_buy = self._df_permnos_to_buy.shift(1).dropna() # because if we buy at i we get returns in i+1, not here
         # In the data returns at date i are the returns we would get if we buy at i
-
 
         df_rets = df_data[['RET', 'PERMNO']].pivot_table(columns='PERMNO', index='date')
         df_rets = df_rets.dropna().RET
@@ -95,15 +94,15 @@ class Backtester:
         df_results = pd.DataFrame(columns=strategies, index=self._df_permnos_to_buy.index)
         for date in self._df_permnos_to_buy.index:
             for strat in strategies:
-                list_permnos_to_buy,weight_permnos_to_buy = self._df_permnos_to_buy.loc[date][strat]
+                list_permnos_to_buy, weight_permnos_to_buy = self._df_permnos_to_buy.loc[date][strat]
                 if len(list_permnos_to_buy) == 0:
                     df_results.loc[date][strat] = 1.  # we buy nothing
                 else:
-                    df_results.loc[date][strat] = np.sum(np.array(df_rets.loc[date][list_permnos_to_buy]) * np.array(weight_permnos_to_buy))
+                    df_results.loc[date][strat] = np.sum(
+                        np.array(df_rets.loc[date][list_permnos_to_buy]) * np.array(weight_permnos_to_buy))
         return df_results
 
-
-    def __create_signals(self, df_data, strategies=['10_max_long', '20_max_long'], bins=None,equi_weighted = True):
+    def __create_signals(self, df_data, strategies=['10_max_long', '20_max_long'], bins=None, equi_weighted=True):
         """
         Creates the list of stocks to buy in each strategy for each rebalacing date
 
@@ -130,29 +129,28 @@ class Backtester:
         data_sorted_short_all_dates = df_data.reset_index().sort_values(by='short', ascending=False).set_index('date')
         df_temp = df_data.copy()
         df_temp['long_short'] = df_temp.long - 0.4 * df_temp.short
-        data_sorted_long_short_all_dates = df_temp.reset_index().sort_values(by='long_short', ascending=False).set_index('date')
+        data_sorted_long_short_all_dates = df_temp.reset_index().sort_values(by='long_short',
+                                                                             ascending=False).set_index('date')
 
         # empty dataframe that will be used to store results
         df_permnos_to_buy = pd.DataFrame(columns=strategies, index=sorted(set(df_data.index)))
 
         def get_weights(data_sorted, list_permnos_to_buy):
             if equi_weighted:
-                weight_permnos = np.ones(len(list_permnos_to_buy))/len(list_permnos_to_buy)
-            else:   # make weights proportional to the signal we consider
+                weight_permnos = np.ones(len(list_permnos_to_buy)) / len(list_permnos_to_buy)
+            else:  # make weights proportional to the signal we consider
                 weight_permnos = data_sorted.loc[list_permnos_to_buy].values.T[0]
                 weight_permnos = weight_permnos / weight_permnos.sum()
             return weight_permnos
-
-        # TODO: put threshold on pure long/short stratgy, so that the condition of 10 stocks a day is not a must but a cap
-        # This would help to remove the similar trend betwen our bins and the index
 
         # calculate proportional weights and stocks to buy in each bin
         def perform_bin_strategy(data_sorted):
             bin = int(strat.split('_')[0])  # format must be '4_bins_...' for the 4th bin
             n_stocks = len(data_sorted.index)
-            list_permnos_to_buy = list(data_sorted.index)[round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)]
+            list_permnos_to_buy = list(data_sorted.index)[
+                                  round((bin - 1) * n_stocks / bins):round(bin * n_stocks / bins)]
             weight_permnos = get_weights(data_sorted, list_permnos_to_buy)
-            return list_permnos_to_buy,weight_permnos
+            return list_permnos_to_buy, weight_permnos
 
         for date in df_data.index:
             data_sorted_long = data_sorted_long_all_dates.loc[date].set_index('PERMNO')[['long']]
@@ -173,14 +171,14 @@ class Backtester:
                     list_permnos_to_buy = list(df_data[df_data.long >= 0.75].index)
                     weight_permnos = get_weights(data_sorted_long, list_permnos_to_buy)
                 elif 'bins_long' in strat:
-                    list_permnos_to_buy,weight_permnos = perform_bin_strategy(data_sorted_long)
+                    list_permnos_to_buy, weight_permnos = perform_bin_strategy(data_sorted_long)
                 elif 'bins_short' in strat:
-                    list_permnos_to_buy,weight_permnos = perform_bin_strategy(data_sorted_short)
+                    list_permnos_to_buy, weight_permnos = perform_bin_strategy(data_sorted_short)
                 elif 'bins_long_short' in strat:
-                    list_permnos_to_buy,weight_permnos = perform_bin_strategy(data_sorted_long_short)
+                    list_permnos_to_buy, weight_permnos = perform_bin_strategy(data_sorted_long_short)
                 else:
                     raise NotImplementedError('The strategy {} is not implemented'.format(strat))
-                df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy,weight_permnos
+                df_permnos_to_buy.loc[date][strat] = list_permnos_to_buy, weight_permnos
         self.log('Signals created')
         return df_permnos_to_buy
 
@@ -255,8 +253,7 @@ class Backtester:
         return pred
 
     def plot_backtest(self):
-
-        return plot_highstock_with_table(self.df_strats, title='Backtest for different strategies')
+        self.df_strats.plot(grid=True,figsize=(16,12),title='Backtest for different strategies')
 
     def get_df_all_data(self):
         """
@@ -282,13 +279,12 @@ class Backtester:
         for i, file_name in enumerate(list_file_names):
             path = os.path.join(samples_path, file_name)
             df_all_data_one_batch = load_pickle(path, logger_env=self.__LOGGER_ENV)
-            index_list = list(df_all_data_one_batch.index)
             self.log(
-                'first_date: {}, last_date: {}'.format(index_list[0], index_list[-1]))
+                'first_date: {}, last_date: {}'.format(df_all_data_one_batch.index[0], df_all_data_one_batch.index[-1]))
             # Keeping only the dates we want for the backtest
             df_all_data_one_batch = df_all_data_one_batch.loc[self._start_date:self._end_date]
-            self.log('new first_date: {}, new last_date: {}'.format(index_list[0],
-                                                                    index_list[-1]))
+            self.log('new first_date: {}, new last_date: {}'.format(df_all_data_one_batch.index[0],
+                                                                    df_all_data_one_batch.index[-1]))
 
             # in each of the pickle files the data is sorted in chronologic order we resort just in case
             df_all_data_one_batch = df_all_data_one_batch.sort_index()
@@ -312,10 +308,11 @@ class Backtester:
         :param df_backt_results:pd.DataFrame: results of the backtest data by date
         :return: pd.DataFrame cumulative results with a datetime index and an extra column 'Cash' which is the SPX
         """
-        df_backt_results = df_backt_results.shift(1).dropna()  # because returns in reality do not happen just when we buy, but on next week
+        df_backt_results = df_backt_results.shift(
+            1).dropna()  # because returns in reality do not happen just when we buy, but on next week
         df_strats = df_backt_results.astype(np.float64)
         df_strats = integer_to_timestamp_date_index(df_strats)
-        df_strats = df_strats.cumprod() /df_strats.iloc[0]
+        df_strats = df_strats.cumprod() / df_strats.iloc[0]
 
         # we get SPX data and add it to the dataframe
         df_spx = pd.read_csv('data/^GSPC.csv', index_col=0, usecols=['Date', 'Close'])
