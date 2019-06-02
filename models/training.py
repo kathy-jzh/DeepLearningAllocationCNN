@@ -151,8 +151,8 @@ def _run_epochs(restore, sess, net, X, Y, valX, valY, sample_size, epochs,
 
         # Displaying training info for the epoch
         if (e + 1) % display_step == 0:
-            text_to_print = "Training time: {}  ======== Loss: {:.4f} Accuracy: {:.4f} val_Loss: {:.4f} val_acc: {:.4f} ".format(
-                round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_loss, epoch_val_acc)
+            text_to_print = "Training time: {}  ======== Loss: {:.4f} Accuracy: {:.4f} val_acc: {:.4f} ".format(
+                round(time.time() - epoch_start_time, 2), epoch_loss, epoch_acc, epoch_val_acc)
             log(text_to_print, DEFAULT_LOG_ENV)
 
         # Saving the model

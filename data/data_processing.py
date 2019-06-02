@@ -124,7 +124,6 @@ class DataHandler:
             btch_stocks = self._stocks_list[batch * self._nb_of_stocks_by_file:(batch + 1) * self._nb_of_stocks_by_file]
             df_batch_data = self._extract_data_for_stocks(df_data_multi_index, btch_stocks)
             # Build Images and targets
-            del df_res
             df_res = self._build_images_one_batch(df_batch_data, btch_name)
             # Sort by dates
             df_res = df_res.set_index('date').sort_index()
