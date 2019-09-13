@@ -8,7 +8,6 @@ DEFAULT_LEARNING_RATE = 0.001
 DEFAULT_TF_OPTIMIZER = 'Adam'
 DEFAULT_LOG_ENV = 'training_and_validation'
 NB_OF_EPOCHS_FOR_BAYESIAN = 10
-FRAC_BATCH_TO_DISPLAY = 0.1
 
 DEFAULT_FILES_NAMES = ['stockData_' + str(i) for i in range(1, 28)]
 DEFAULT_START_DATE = 19900101
@@ -95,4 +94,7 @@ GoogleNet_hyperparams = {'first_block': first_block_gglnet_hyperparam,
                          'inception_2': inception2_hyperparam,
                          'inception_3': inception3_hyperparam,
                          'dropout': 0.15,
+                         'learning_rate':0.003,
                          }
+
+ResNet_hyperparams = {'learning_rate':0.003,'tf_optimizer':'rmsprop','dropout':0.1}
